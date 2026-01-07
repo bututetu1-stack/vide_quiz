@@ -826,16 +826,21 @@
 
                 // ★ UUIDベースで回答権判定（同名ユーザー対策）★
                 const myUserId = localStorage.getItem('vibeQuizUserId') || '';
-                if (buzzerUserId === myUserId) {
+                const currentBuzzerUserId = data.buzzerUserId || '';  // ★ 現在のbuzzerUserIdを取得 ★
+
+                console.log('Buzz check:', { myUserId, currentBuzzerUserId, name });
+
+                if (currentBuzzerUserId && currentBuzzerUserId === myUserId) {
                     els.ansArea.classList.remove('hidden');
                     els.buzzer.classList.add('hidden');  // 回答権獲得者はボタン非表示
                     setTimeout(() => document.getElementById('answerInput').focus(), 100);
 
                     if (buzzTimeout) clearTimeout(buzzTimeout);
+                    const capturedBuzzerUserId = currentBuzzerUserId;  // ★ クロージャで保持 ★
                     buzzTimeout = setTimeout(async () => {
-                        if (currentStatus === 'buzzed' && buzzerUserId === myUserId) {
+                        if (currentStatus === 'buzzed' && capturedBuzzerUserId === myUserId) {
                             const time = player && player.getCurrentTime ? player.getCurrentTime() : 0;
-                            try { await window.VibeQuiz.reportLoss(roomId, currentUser, time); } catch (e) { }
+                            try { await window.VibeQuiz.reportLoss(roomId, currentUser, time); } catch (e) { console.error(e); }
                         }
                     }, currentAnswerTime * 1000);
                 } else {
