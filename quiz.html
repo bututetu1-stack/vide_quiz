@@ -650,7 +650,7 @@
                 }
 
                 currentStatus = data.status || 'waiting';
-                buzzerUserId = data.buzzerUser;
+                buzzerUserId = data.buzzerUserId || '';  // ★ UUIDで判定 ★
                 currentSongId = data.currentSongId;
                 currentSongAddedBy = data.currentSongAddedBy || null;
                 wrongAnswers = data.wrongAnswers || {};
@@ -824,14 +824,16 @@
                     }
                 }, 1000);
 
-                if (name === currentUser) {
+                // ★ UUIDベースで回答権判定（同名ユーザー対策）★
+                const myUserId = localStorage.getItem('vibeQuizUserId') || '';
+                if (buzzerUserId === myUserId) {
                     els.ansArea.classList.remove('hidden');
                     els.buzzer.classList.add('hidden');  // 回答権獲得者はボタン非表示
                     setTimeout(() => document.getElementById('answerInput').focus(), 100);
 
                     if (buzzTimeout) clearTimeout(buzzTimeout);
                     buzzTimeout = setTimeout(async () => {
-                        if (currentStatus === 'buzzed' && buzzerUserId === currentUser) {
+                        if (currentStatus === 'buzzed' && buzzerUserId === myUserId) {
                             const time = player && player.getCurrentTime ? player.getCurrentTime() : 0;
                             try { await window.VibeQuiz.reportLoss(roomId, currentUser, time); } catch (e) { }
                         }

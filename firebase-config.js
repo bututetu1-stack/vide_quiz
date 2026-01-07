@@ -378,6 +378,7 @@ window.VibeQuiz = {
                 // buzzTimesから最速押下者を判定
                 const buzzTimes = room.buzzTimes || {};
                 let fastestUser = null;
+                let fastestUserId = null;
                 let fastestTime = Infinity;
 
                 for (const [uid, data] of Object.entries(buzzTimes)) {
@@ -386,12 +387,14 @@ window.VibeQuiz = {
                     if (data.time < fastestTime) {
                         fastestTime = data.time;
                         fastestUser = data.username;
+                        fastestUserId = uid;  // ★ UUIDを記録 ★
                     }
                 }
 
                 if (fastestUser && !room.buzzerUser) {
                     room.status = 'buzzed';
                     room.buzzerUser = fastestUser;
+                    room.buzzerUserId = fastestUserId;  // ★ UUIDも保存 ★
                     room.buzzedAt = Date.now(); // ★ 回答開始時刻を記録 ★
                 }
                 return room;
