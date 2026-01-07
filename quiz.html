@@ -765,18 +765,21 @@
                     if (player && player.loadVideoById) {
                         const url = player.getVideoUrl ? player.getVideoUrl() : '';
                         const videoId = currentSongData.youtubeId;
+                        const seekTo = data.seekTo || 0;  // ★ 巻き戻し位置 ★
 
                         if (!url || !url.includes(videoId)) {
-                            // Always start from the beginning for fair gameplay
-                            // (Sync seek was causing issues with buffering delay)
+                            // 新しい曲をロード
                             player.loadVideoById({
                                 videoId: videoId,
-                                startSeconds: 0
+                                startSeconds: seekTo
                             });
                             player.setVolume(100);
-
-                            console.log(`Playing: ${videoId} from start`);
+                            console.log(`Playing: ${videoId} from ${seekTo}s`);
                         } else {
+                            // ★ 同じ曲ならseekして再生 ★
+                            if (seekTo > 0) {
+                                player.seekTo(seekTo, true);
+                            }
                             if (player.getPlayerState() !== 1) player.playVideo();
                         }
                     }

@@ -389,6 +389,7 @@ window.VibeQuiz = {
                 if (fastestUser && !room.buzzerUser) {
                     room.status = 'buzzed';
                     room.buzzerUser = fastestUser;
+                    room.buzzedAt = Date.now(); // ★ 回答開始時刻を記録 ★
                 }
                 return room;
             }
@@ -579,10 +580,20 @@ window.VibeQuiz = {
         }
 
         const rewindTime = Math.max(0, currentVideoTime - 5);
+
+        // ★ 回答時間を曲の制限時間から除外するためplayStartTimeを調整 ★
+        // 現在のplayStartTimeに回答に費やした時間を加算
+        const roomSnap2 = await roomRef.once('value');
+        const currentPlayStartTime = roomSnap2.val().playStartTime || Date.now();
+        const buzzedTime = roomSnap2.val().buzzedAt || Date.now();
+        const answerDuration = Date.now() - buzzedTime; // 回答に費やした時間
+
         await roomRef.update({
             status: 'playing',
             buzzerUser: null,
+            buzzTimes: null,  // ★ buzzTimesをクリア ★
             seekTo: rewindTime,
+            playStartTime: currentPlayStartTime + answerDuration, // ★ 回答時間分を加算 ★
             message: {
                 text: `❌ ${username} 不正解...${penaltyMsg} (5秒戻ります)`,
                 type: "error",
