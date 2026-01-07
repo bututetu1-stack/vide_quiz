@@ -698,6 +698,9 @@
                 els.timerContainer.classList.add('hidden');
                 els.buzzerStatus.classList.add('hidden');
                 if (player && player.pauseVideo) player.pauseVideo();
+
+                // ★ 待機中は設定セクションを表示 ★
+                document.getElementById('settingsSection').classList.remove('hidden');
             }
             else if (status === 'playing') {
                 els.rank.classList.add('hidden');
@@ -708,6 +711,9 @@
 
                 // ★ 秒数表示をリセット ★
                 document.getElementById('myBuzzTime').classList.add('hidden');
+
+                // ★ ゲーム中は設定セクションを非表示 ★
+                document.getElementById('settingsSection').classList.add('hidden');
 
                 els.timerContainer.classList.remove('hidden');
                 requestAnimationFrame(() => {
