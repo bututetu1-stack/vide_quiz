@@ -757,10 +757,14 @@
                         }, 10000);
                     }
                 } else {
-                    els.buzzer.disabled = false;
-                    els.buzzer.style.opacity = "1";
-                    els.buzzer.innerText = "PUSH";
-                    els.buzzer.onclick = () => window.buzz();  // ★ onclick復元 ★
+                    // ★ まだ今回ボタンを押していない場合のみPUSH表示 ★
+                    if (myLastBuzzTime === null) {
+                        els.buzzer.disabled = false;
+                        els.buzzer.style.opacity = "1";
+                        els.buzzer.innerText = "PUSH";
+                        els.buzzer.onclick = () => window.buzz();
+                    }
+                    // ★ 既に押していた場合はそのまま維持（UI変更しない）★
                     if (wrongAnswerRecoveryTimer) { clearTimeout(wrongAnswerRecoveryTimer); wrongAnswerRecoveryTimer = null; }
                 }
 
@@ -847,36 +851,15 @@
                     }, currentAnswerTime * 1000);
                 } else {
                     // ★ 他の人が回答権を得た場合 ★
-                    const myBuzzTimeEl = document.getElementById('myBuzzTime');
-                    const alreadyBuzzed = myLastBuzzTime !== null || !myBuzzTimeEl.classList.contains('hidden');
+                    // ボタンUIは変更しない（押した状態を維持）
 
-                    if (alreadyBuzzed) {
-                        // ★ 既にボタンを押していた場合は秒数表示を維持/復元 ★
-                        if (myLastBuzzTime !== null && myBuzzTimeEl.classList.contains('hidden')) {
-                            // ★ タイミングの問題で非表示になっていた場合は復元 ★
+                    // ★ 秒数表示の復元のみ行う ★
+                    if (myLastBuzzTime !== null) {
+                        const myBuzzTimeEl = document.getElementById('myBuzzTime');
+                        if (myBuzzTimeEl.classList.contains('hidden')) {
                             document.getElementById('myBuzzTimeValue').textContent = myLastBuzzTime.toFixed(2) + '秒';
                             myBuzzTimeEl.classList.remove('hidden');
                         }
-                        els.buzzer.classList.remove('hidden');
-                        els.buzzer.disabled = true;
-                        els.buzzer.innerText = "✓";
-                        els.buzzer.style.opacity = "0.5";
-                    } else {
-                        // ★ まだボタンを押していない場合 ★
-                        els.buzzer.classList.remove('hidden');
-                        els.buzzer.disabled = false;
-                        els.buzzer.innerText = "⏳";
-                        els.buzzer.style.opacity = "0.7";
-                        els.buzzer.onclick = () => {
-                            // ★ 曲開始からの経過時間を計算 ★
-                            const serverNow = Date.now() + serverTimeOffset;
-                            const buzzTime = Math.max(0, (serverNow - currentStartTime) / 1000);
-                            document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
-                            document.getElementById('myBuzzTime').classList.remove('hidden');
-                            // ボタンを押した後は無効化
-                            els.buzzer.disabled = true;
-                            els.buzzer.innerText = "✓";
-                        };
                     }
                 }
             }
@@ -1060,15 +1043,20 @@
         window.buzz = () => {
             // ★ UUIDベースでwrongAnswersチェック（同名ユーザー対策）★
             const userId = localStorage.getItem('vibeQuizUserId') || '';
-            if (!wrongAnswers[userId]) {
+            if (!wrongAnswers[userId] && myLastBuzzTime === null) {
                 // ★ 曲開始からの経過時間を計算（サーバー時刻同期）★
                 const serverNow = Date.now() + serverTimeOffset;
                 const buzzTime = Math.max(0, (serverNow - currentStartTime) / 1000);
-                myLastBuzzTime = buzzTime;  // ★ 一時保存（buzzed状態処理で使用）★
+                myLastBuzzTime = buzzTime;  // ★ 一時保存 ★
+
+                // ★ UI確定（状態変更に依存しない）★
                 document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
                 document.getElementById('myBuzzTime').classList.remove('hidden');
+                els.buzzer.disabled = true;
+                els.buzzer.innerText = "✓";
+                els.buzzer.style.opacity = "0.5";
 
-                // ★ 既にbuzzed状態でも秒数は表示するが、Firebaseには送信しない ★
+                // ★ Firebaseに送信（playingの場合のみ）★
                 if (currentStatus === 'playing') {
                     window.VibeQuiz.buzz(roomId, currentUser, userId, buzzTime);
                 }
