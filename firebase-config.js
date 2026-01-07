@@ -181,8 +181,16 @@ window.VibeQuiz = {
 
         // Check if game is in progress
         const status = roomData.status || 'waiting';
-        if (status !== 'waiting' && status !== 'completed') {
-            throw new Error("ゲーム中のため参加できません。\nゲーム終了後に再度お試しください。");
+        const isSpectator = status !== 'waiting' && status !== 'completed';
+
+        if (isSpectator) {
+            // ★ 観戦者として参加 ★
+            const spectatorRef = roomRef.child(`spectators`).push();
+            await spectatorRef.set({
+                name: username,
+                joinedAt: Date.now()
+            });
+            return { isSpectator: true };
         }
 
         const userRef = roomRef.child(`users`).push();
