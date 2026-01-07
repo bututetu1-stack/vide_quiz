@@ -57,6 +57,7 @@ window.VibeQuiz = {
 
         await roomRef.set({
             hostName: hostName,
+            hostUUID: getOrCreateUserId(),  // ★ ホストのUUIDを保存 ★
             status: 'waiting',
             settings: {
                 maxQuestions: parseInt(settings.maxQuestions) || 10,
@@ -194,8 +195,10 @@ window.VibeQuiz = {
         }
 
         const userRef = roomRef.child(`users`).push();
+        const userUUID = getOrCreateUserId();
         await userRef.set({
             name: username,
+            uuid: userUUID,  // ★ UUIDを保存 ★
             score: 0,
             online: true,
             joinedAt: Date.now()

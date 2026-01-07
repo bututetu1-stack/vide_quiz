@@ -590,8 +590,9 @@
                             <button onclick="kickUser('${uid}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs">✖</button>
                         `;
                     } else {
-                        // ★ ホスト名と一致する人に冠を表示 ★
-                        const hostBadge = u.name === currentHostName ? ' 👑' : '';
+                        // ★ UUIDベースでホスト判定（同名ユーザー対策）★
+                        const hostUUID = data.hostUUID || '';
+                        const hostBadge = u.uuid === hostUUID ? ' 👑' : '';
                         li.textContent = `${u.name}${hostBadge} (${u.score || 0}pt)`;
                     }
                     list.appendChild(li);
