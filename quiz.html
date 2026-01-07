@@ -345,6 +345,7 @@
         let currentHostName = null;
         let handicapMode = false;
         let serverTimeOffset = 0; // Difference between server and client time
+        let myLastBuzzTime = null; // ★ 自分が押した秒数を一時保存 ★
         // ★★★ 設定変数 ★★★
         let currentPlayDuration = 30; // 曲再生時間（秒）
         let currentAnswerTime = 15;   // 回答入力時間（秒）
@@ -713,6 +714,7 @@
 
                 // ★ 秒数表示をリセット ★
                 document.getElementById('myBuzzTime').classList.add('hidden');
+                myLastBuzzTime = null;  // ★ 一時保存もリセット ★
 
                 // ★ ゲーム中は設定セクションを非表示 ★
                 document.getElementById('settingsSection').classList.add('hidden');
@@ -846,10 +848,15 @@
                 } else {
                     // ★ 他の人が回答権を得た場合 ★
                     const myBuzzTimeEl = document.getElementById('myBuzzTime');
-                    const alreadyBuzzed = !myBuzzTimeEl.classList.contains('hidden');
+                    const alreadyBuzzed = myLastBuzzTime !== null || !myBuzzTimeEl.classList.contains('hidden');
 
                     if (alreadyBuzzed) {
-                        // ★ 既にボタンを押していた場合は秒数表示を維持 ★
+                        // ★ 既にボタンを押していた場合は秒数表示を維持/復元 ★
+                        if (myLastBuzzTime !== null && myBuzzTimeEl.classList.contains('hidden')) {
+                            // ★ タイミングの問題で非表示になっていた場合は復元 ★
+                            document.getElementById('myBuzzTimeValue').textContent = myLastBuzzTime.toFixed(2) + '秒';
+                            myBuzzTimeEl.classList.remove('hidden');
+                        }
                         els.buzzer.classList.remove('hidden');
                         els.buzzer.disabled = true;
                         els.buzzer.innerText = "✓";
@@ -1057,6 +1064,7 @@
                 // ★ 曲開始からの経過時間を計算（サーバー時刻同期）★
                 const serverNow = Date.now() + serverTimeOffset;
                 const buzzTime = Math.max(0, (serverNow - currentStartTime) / 1000);
+                myLastBuzzTime = buzzTime;  // ★ 一時保存（buzzed状態処理で使用）★
                 document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
                 document.getElementById('myBuzzTime').classList.remove('hidden');
 
