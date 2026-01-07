@@ -844,19 +844,32 @@
                         }
                     }, currentAnswerTime * 1000);
                 } else {
-                    // ★ 他の人はボタン表示のまま、押すと秒数表示 ★
-                    els.buzzer.disabled = false;
-                    els.buzzer.innerText = "⏳";
-                    els.buzzer.style.opacity = "0.7";
-                    els.buzzer.onclick = () => {
-                        // 秒数を表示するが、回答権は得られない
-                        const buzzTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
-                        document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
-                        document.getElementById('myBuzzTime').classList.remove('hidden');
-                        // ボタンを押した後は無効化
+                    // ★ 他の人が回答権を得た場合 ★
+                    const myBuzzTimeEl = document.getElementById('myBuzzTime');
+                    const alreadyBuzzed = !myBuzzTimeEl.classList.contains('hidden');
+
+                    if (alreadyBuzzed) {
+                        // ★ 既にボタンを押していた場合は秒数表示を維持 ★
+                        els.buzzer.classList.remove('hidden');
                         els.buzzer.disabled = true;
                         els.buzzer.innerText = "✓";
-                    };
+                        els.buzzer.style.opacity = "0.5";
+                    } else {
+                        // ★ まだボタンを押していない場合 ★
+                        els.buzzer.classList.remove('hidden');
+                        els.buzzer.disabled = false;
+                        els.buzzer.innerText = "⏳";
+                        els.buzzer.style.opacity = "0.7";
+                        els.buzzer.onclick = () => {
+                            // 秒数を表示するが、回答権は得られない
+                            const buzzTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+                            document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
+                            document.getElementById('myBuzzTime').classList.remove('hidden');
+                            // ボタンを押した後は無効化
+                            els.buzzer.disabled = true;
+                            els.buzzer.innerText = "✓";
+                        };
+                    }
                 }
             }
             else if (status === 'completed') {
