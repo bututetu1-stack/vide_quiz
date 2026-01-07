@@ -362,11 +362,11 @@ window.VibeQuiz = {
     buzz: async (roomId, username, userId, buzzTime) => {
         const roomRef = db.ref(`rooms/${roomId}`);
 
-        // ★ buzzTimeを記録（最速押下者判定用）★
+        // ★ サーバー時刻を記録（端末間のバッファリング差を解消）★
         await roomRef.child(`buzzTimes/${userId}`).set({
             username: username,
-            time: buzzTime,
-            timestamp: Date.now()
+            localTime: buzzTime,  // 表示用（端末での再生位置）
+            serverTimestamp: firebase.database.ServerValue.TIMESTAMP  // 判定用（サーバー時刻）
         });
 
         // トランザクションで最速押下者を判定
@@ -375,7 +375,7 @@ window.VibeQuiz = {
                 // wrongAnswersチェック
                 if (room.wrongAnswers && room.wrongAnswers[userId]) return room;
 
-                // buzzTimesから最速押下者を判定
+                // buzzTimesから最速押下者を判定（サーバー時刻ベース）
                 const buzzTimes = room.buzzTimes || {};
                 let fastestUser = null;
                 let fastestUserId = null;
@@ -384,8 +384,10 @@ window.VibeQuiz = {
                 for (const [uid, data] of Object.entries(buzzTimes)) {
                     // wrongAnswersに登録されているユーザーは除外
                     if (room.wrongAnswers && room.wrongAnswers[uid]) continue;
-                    if (data.time < fastestTime) {
-                        fastestTime = data.time;
+                    // ★ サーバー時刻で判定（端末間のバッファリング差を解消）★
+                    const timestamp = data.serverTimestamp || data.time || Infinity;
+                    if (timestamp < fastestTime) {
+                        fastestTime = timestamp;
                         fastestUser = data.username;
                         fastestUserId = uid;  // ★ UUIDを記録 ★
                     }
