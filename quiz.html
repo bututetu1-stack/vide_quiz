@@ -590,8 +590,8 @@
                             <button onclick="kickUser('${uid}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs">✖</button>
                         `;
                     } else {
-                        const hostBadge = u.name === currentHostName ? ' 👑' : '';
-                        li.textContent = `${u.name}${hostBadge} (${u.score || 0}pt)`;
+                        // ★ 冠は部屋の作成者名と一致し、最初に見つかった人のみ表示 ★
+                        li.textContent = `${u.name} (${u.score || 0}pt)`;
                     }
                     list.appendChild(li);
                 });
