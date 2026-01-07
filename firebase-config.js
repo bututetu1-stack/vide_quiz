@@ -375,7 +375,7 @@ window.VibeQuiz = {
                 // wrongAnswersチェック
                 if (room.wrongAnswers && room.wrongAnswers[userId]) return room;
 
-                // buzzTimesから最速押下者を判定（サーバー時刻ベース）
+                // buzzTimesから最速押下者を判定（曲開始からの経過時間ベース）
                 const buzzTimes = room.buzzTimes || {};
                 let fastestUser = null;
                 let fastestUserId = null;
@@ -384,10 +384,10 @@ window.VibeQuiz = {
                 for (const [uid, data] of Object.entries(buzzTimes)) {
                     // wrongAnswersに登録されているユーザーは除外
                     if (room.wrongAnswers && room.wrongAnswers[uid]) continue;
-                    // ★ サーバー時刻で判定（端末間のバッファリング差を解消）★
-                    const timestamp = data.serverTimestamp || data.time || Infinity;
-                    if (timestamp < fastestTime) {
-                        fastestTime = timestamp;
+                    // ★ localTime（曲開始からの経過時間）で判定 ★
+                    const buzzTime = data.localTime !== undefined ? data.localTime : (data.time || Infinity);
+                    if (buzzTime < fastestTime) {
+                        fastestTime = buzzTime;
                         fastestUser = data.username;
                         fastestUserId = uid;  // ★ UUIDを記録 ★
                     }
