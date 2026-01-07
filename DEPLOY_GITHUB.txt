@@ -1,0 +1,59 @@
+
+# 🌐 Vibe Quiz Online - デプロイガイド (GitHub Pages編)
+
+Netlify Dropが使えなくなった場合、**GitHub Pages** が最も確実で無料の選択肢です。
+
+## 初回セットアップ手順
+
+1. **GitHubアカウントの用意**
+   - [GitHub](https://github.com/) にアクセスし、アカウントを作成（またはログイン）します。
+
+2. **リポジトリの作成**
+   - 右上の「+」アイコン → 「New repository」をクリック。
+   - Repository name: `vibe-quiz` (なんでもOK)
+   - Public を選択。
+   - 「Create repository」をクリック。
+
+3. **ファイルのアップロード**
+   - 作成後の画面で「uploading an existing file」というリンクを探してクリックします。
+   - 以下のファイルをドラッグ＆ドロップします：
+     - `index.html`
+     - `quiz.html`
+     - `playlist.html`
+     - `admin.html`
+     - `firebase-config.js`
+   - 下の「Commit changes」ボタンを押します。
+
+4. **GitHub Pagesの有効化**
+   - リポジトリのメニュー「Settings」タブをクリック。
+   - 左側のサイドバーから「Pages」をクリック。
+   - **Source**: `Deploy from a branch`
+   - **Branch**: `main` (または `master`) / `(root)` を選択し、「Save」をクリック。
+
+5. **完了**
+   - 数分待つと、ページ上部に `Your site is live at...` とURLが表示されます。
+   - そのURLをご友人に共有すれば、すぐに遊べます！
+
+---
+
+## 🔄 サイトの更新方法
+
+機能修正などを行って、サイトを更新したい場合は以下の通りです：
+
+1. **リポジトリを開く**
+   - GitHubで自分のリポジトリ（`vibe-quiz`など）のトップページを開きます。
+
+2. **ファイルを上書きアップロード**
+   - ファイル一覧の右上にある **「Add file」** ボタンを押し、**「Upload files」** を選択します。
+   - 更新したいファイル（例：`quiz.html`, `firebase-config.js` など、あるいは全部）を再度ドラッグ＆ドロップします。
+   - 下の **「Commit changes」** ボタンを押します。
+
+3. **反映待ち**
+   - 自動的にGitHub Pagesが更新されます。
+   - 通常1～2分ほどで反映されますが、ブラウザのキャッシュが残っている場合があるので、変わらない場合は **スーパーリロード（Ctrl + F5）** を試してください。
+
+---
+
+## 注意点
+- データベース(Firebase)は共通なので、どこにデプロイしても（ローカルでも）同じ部屋・同じプレイリストを参照します。
+- 友人が曲を追加したいときは、このURLの末尾を `/playlist.html` に変えてアクセスしてもらってください。

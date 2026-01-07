@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>俺達のイントロクイズ！ - Play</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            touch-action: manipulation;
+        }
+
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* スマホでサイドバーをほぼフルスクリーンに */
+        @media (max-width: 768px) {
+            #memberListPanel {
+                width: 90vw !important;
+                max-width: 90vw !important;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-indigo-900 text-white h-screen flex flex-col overflow-hidden relative">
+
+    <!-- Start Overlay -->
+    <div id="startOverlay"
+        class="fixed inset-0 bg-black/80 z-[100] flex flex-col items-center justify-center cursor-pointer">
+        <div class="bg-indigo-600 p-8 rounded-2xl shadow-2xl text-center border-4 border-white animate-bounce">
+            <h1 class="text-3xl font-bold mb-4">🎵 クイズに参加</h1>
+            <p class="text-xl">ここをタップしてスタート！</p>
+            <p class="text-sm mt-2 opacity-75">※音声が再生されます</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <div
+        class="bg-indigo-800 p-4 shadow-md flex justify-between items-center z-30 shrink-0 border-b border-indigo-600 relative">
+        <h1 class="font-bold text-lg text-yellow-500">俺達のイントロクイズ！</h1>
+        <div class="flex items-center space-x-2">
+            <div class="text-xs bg-indigo-950 px-2 py-1 rounded text-gray-400">ROOM: <span id="roomIdDisp"
+                    class="text-white font-mono font-bold">...</span></div>
+            <div id="headerStatus" class="text-sm font-mono text-gray-300 font-bold bg-black/30 px-3 py-1 rounded">
+                WAITING</div>
+        </div>
+    </div>
+
+    <button onclick="window.forceAudio()"
+        class="absolute top-16 right-4 z-50 bg-gray-700 text-xs px-2 py-1 rounded opacity-50 hover:opacity-100">🔊</button>
+
+    <!-- Main Content -->
+    <div class="flex-grow relative flex flex-col md:flex-row items-stretch justify-center overflow-hidden w-full z-20">
+
+        <!-- Sidebar -->
+        <div id="memberListPanel"
+            class="absolute md:relative md:w-1/4 h-full p-4 bg-indigo-900/95 z-40 flex flex-col items-center justify-start overflow-y-auto w-64 top-0 left-0 transition-transform duration-300 transform -translate-x-full md:translate-x-0 border-r border-indigo-700 shrink-0 shadow-xl pb-safe">
+            <div class="w-full flex justify-between items-center mb-4 border-b border-pink-500 pb-2">
+                <h2 class="text-xl font-bold text-pink-300">参加者リスト</h2>
+                <button onclick="document.getElementById('memberListPanel').classList.add('-translate-x-full')"
+                    class="md:hidden bg-red-600 hover:bg-red-500 p-3 rounded-lg text-2xl font-bold">✖</button>
+            </div>
+            <ul id="participantsListHost" class="w-full space-y-2"></ul>
+
+            <!-- Host Control Panel -->
+            <div id="hostControlPanel" class="hidden w-full mt-4 pt-4 border-t border-pink-500">
+                <h3 class="text-lg font-bold text-yellow-400 mb-3 text-center">👑 ホストコントロール</h3>
+                <div class="space-y-2">
+                    <button id="hostStartBtn"
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-sm shadow-lg transform active:scale-95 transition">
+                        ▶ ゲーム開始 / 次の問題
+                    </button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="hostStopBtn"
+                            class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-3 rounded-lg text-xs">
+                            ⏸ 中断
+                        </button>
+                        <button id="hostFullResetBtn"
+                            class="bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 px-3 rounded-lg text-xs">
+                            🔄 全リセット
+                        </button>
+                    </div>
+                    <button id="hostSongResetBtn"
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-3 rounded-lg text-xs">
+                        🎵 曲だけリセット（スコア維持）
+                    </button>
+                    <button id="hostDisbandBtn"
+                        class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg text-xs mt-2">
+                        🚪 部屋を解散してロビーへ
+                    </button>
+                </div>
+                <div class="mt-3 text-xs text-gray-400 text-center">
+                    現在: 第<span id="hostQCount">0</span>問
+                </div>
+
+                <!-- ★★★ 設定セクション ★★★ -->
+                <div id="settingsSection" class="mt-4 pt-4 border-t border-yellow-500">
+                    <h4 class="text-sm font-bold text-yellow-400 mb-3 text-center cursor-pointer"
+                        onclick="toggleSettingsPanel()">
+                        ⚙️ 設定 <span id="settingsToggleIcon">▼</span>
+                    </h4>
+                    <div id="settingsPanel" class="space-y-3 text-xs">
+                        <!-- プレイリスト選択 -->
+                        <div>
+                            <label class="block text-gray-400 mb-1">🎵 プレイリスト</label>
+                            <div id="playlistCheckboxes"
+                                class="bg-indigo-950 rounded p-2 max-h-28 overflow-y-auto space-y-1">
+                                <!-- 動的に追加 -->
+                            </div>
+                        </div>
+
+                        <!-- 問題数 -->
+                        <div>
+                            <label class="block text-gray-400 mb-1">📝 問題数</label>
+                            <select id="settingMaxQuestions" onchange="saveRoomSettings()"
+                                class="w-full bg-indigo-950 border border-indigo-600 rounded p-2 text-white">
+                                <option value="5">5問</option>
+                                <option value="10">10問</option>
+                                <option value="15">15問</option>
+                                <option value="20">20問</option>
+                                <option value="30">30問</option>
+                                <option value="50">50問</option>
+                            </select>
+                        </div>
+
+                        <!-- 得点設定 -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-gray-400 mb-1">✅ 正解時</label>
+                                <select id="settingCorrectPoints" onchange="saveRoomSettings()"
+                                    class="w-full bg-indigo-950 border border-indigo-600 rounded p-1.5 text-white">
+                                    <option value="0">0pt</option>
+                                    <option value="1">+1pt</option>
+                                    <option value="2">+2pt</option>
+                                    <option value="3">+3pt</option>
+                                    <option value="5">+5pt</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 mb-1">❌ 誤答時</label>
+                                <select id="settingWrongPoints" onchange="saveRoomSettings()"
+                                    class="w-full bg-indigo-950 border border-indigo-600 rounded p-1.5 text-white">
+                                    <option value="0">0pt</option>
+                                    <option value="-1">-1pt</option>
+                                    <option value="-2">-2pt</option>
+                                    <option value="-3">-3pt</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 時間設定 -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-gray-400 mb-1">🎵 曲再生</label>
+                                <select id="settingPlayDuration" onchange="saveRoomSettings()"
+                                    class="w-full bg-indigo-950 border border-indigo-600 rounded p-1.5 text-white">
+                                    <option value="15">15秒</option>
+                                    <option value="20">20秒</option>
+                                    <option value="30">30秒</option>
+                                    <option value="45">45秒</option>
+                                    <option value="60">60秒</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 mb-1">⏱ 入力時間</label>
+                                <select id="settingAnswerTime" onchange="saveRoomSettings()"
+                                    class="w-full bg-indigo-950 border border-indigo-600 rounded p-1.5 text-white">
+                                    <option value="10">10秒</option>
+                                    <option value="15">15秒</option>
+                                    <option value="20">20秒</option>
+                                    <option value="30">30秒</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- ハンデ戦モード -->
+                        <div class="flex items-center justify-between bg-indigo-950 p-2 rounded">
+                            <label class="text-gray-300">🎯 ハンデ戦</label>
+                            <input type="checkbox" id="settingHandicapMode"
+                                onchange="toggleHandicapSettings(); saveRoomSettings()"
+                                class="w-5 h-5 accent-yellow-400">
+                        </div>
+                        <!-- ハンデ戦詳細設定（ハンデモードON時のみ表示） -->
+                        <div id="handicapSettings"
+                            class="hidden space-y-2 bg-yellow-900/30 p-2 rounded border border-yellow-600">
+                            <p class="text-[10px] text-yellow-300 text-center font-bold">ハンデ戦詳細設定</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-gray-400 mb-1 text-[10px]">追加者以外の正解</label>
+                                    <select id="settingHandicapBonus" onchange="saveRoomSettings()"
+                                        class="w-full bg-indigo-950 border border-yellow-600 rounded p-1 text-white text-xs">
+                                        <option value="1">+1pt</option>
+                                        <option value="2">+2pt</option>
+                                        <option value="3">+3pt</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-gray-400 mb-1 text-[10px]">追加者の不正解</label>
+                                    <select id="settingHandicapPenalty" onchange="saveRoomSettings()"
+                                        class="w-full bg-indigo-950 border border-yellow-600 rounded p-1 text-white text-xs">
+                                        <option value="0">0pt</option>
+                                        <option value="-1">-1pt</option>
+                                        <option value="-2">-2pt</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="document.getElementById('memberListPanel').classList.toggle('-translate-x-full')"
+            class="md:hidden absolute top-4 left-4 z-30 bg-indigo-600 p-2 rounded text-xs opacity-50 hover:opacity-100 shadow-md">👥</button>
+
+        <!-- Game Screen -->
+        <div id="gameScreen"
+            class="relative flex-grow h-full flex flex-col items-center justify-center p-4 pb-safe overflow-hidden w-full">
+
+            <!-- Compact Scoreboard (always visible) -->
+            <div id="compactScoreboard"
+                class="absolute top-2 right-2 z-30 bg-indigo-800/90 backdrop-blur-sm rounded-lg p-2 text-xs max-w-[150px] border border-indigo-600 shadow-lg">
+                <div class="text-pink-300 font-bold text-center mb-1 border-b border-indigo-600 pb-1">🏆 スコア</div>
+                <ul id="compactScoreList" class="space-y-0.5 max-h-32 overflow-y-auto">
+                    <!-- Dynamically populated -->
+                </ul>
+            </div>
+
+            <div id="timerContainer" class="absolute top-0 left-0 w-full h-2 bg-gray-800 z-10 hidden">
+                <div id="timerBar" class="h-full w-full transition-all duration-linear"></div>
+            </div>
+
+            <div
+                class="bg-indigo-950 p-6 rounded-3xl shadow-2xl border-4 border-pink-500 w-full max-w-lg text-center relative overflow-hidden flex flex-col items-center z-20">
+                <div id="statusDisplay" class="text-xl font-bold text-gray-400 mb-4 animate-pulse">Wait...</div>
+                <div id="messageBox"
+                    class="text-2xl font-bold mb-6 text-white min-h-[40px] drop-shadow-md break-words w-full"></div>
+
+                <div id="buzzerStatus"
+                    class="hidden mb-4 p-4 bg-yellow-400 text-black font-bold rounded-xl animate-bounce w-full">
+                    🚨 <span id="buzzerName"></span> が回答権を獲得！
+                    <div class="text-sm font-normal mt-1">残り <span id="answerTimer">15</span>秒</div>
+                </div>
+
+                <div id="answerArea" class="hidden mb-4 w-full">
+                    <input type="text" id="answerInput"
+                        class="w-full p-3 rounded-xl text-black font-bold text-center text-lg mb-2"
+                        placeholder="曲名を入力..." autocomplete="off">
+                    <button onclick="submitAnswer()"
+                        class="w-full bg-pink-500 hover:bg-pink-600 py-3 rounded-xl font-bold text-white shadow-lg touch-manipulation">回答する
+                        🎤</button>
+                </div>
+
+                <button id="buzzBtn" onclick="buzz()"
+                    class="w-48 h-48 md:w-64 md:h-64 rounded-full bg-gradient-to-br from-red-500 to-pink-600 shadow-[0_10px_20px_rgba(0,0,0,0.5)] border-8 border-white text-3xl md:text-4xl font-black transform transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation flex items-center justify-center shrink-0">PUSH</button>
+
+                <!-- 押した秒数表示 -->
+                <div id="myBuzzTime" class="hidden mt-4 text-center">
+                    <div class="text-sm text-gray-400">あなたの押した時間</div>
+                    <div id="myBuzzTimeValue" class="text-2xl font-bold text-yellow-400">0.00秒</div>
+                </div>
+            </div>
+
+            <div id="rankingOverlay"
+                class="hidden absolute inset-0 bg-indigo-900 z-[60] flex flex-col items-center justify-start p-6 overflow-y-auto">
+                <h1 class="text-4xl font-bold text-yellow-400 mb-6">🏆 結果発表 🏆</h1>
+                <ul id="rankingList" class="w-full max-w-md space-y-3 mb-6"></ul>
+
+                <h2
+                    class="text-2xl font-bold text-pink-300 mb-4 border-t border-pink-500 pt-4 w-full max-w-md text-center">
+                    📋 問題履歴</h2>
+                <div id="historyList" class="w-full max-w-md space-y-2 mb-6"></div>
+
+                <!-- 高速回答ランキング -->
+                <div id="speedRankingArea" class="w-full max-w-md mb-6 border-t border-yellow-500 pt-4"></div>
+
+                <div id="replayArea" class="mt-4"></div>
+                <a href="index.html" class="mt-4 text-white underline block text-center">ロビーに戻る</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Player - 完全に非表示で曲情報が見えないようにする -->
+    <div id="playerContainer"
+        style="position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; visibility: hidden; pointer-events: none; z-index: -9999;">
+        <div id="player" style="width: 1px; height: 1px;"></div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"
+        class="fixed top-20 left-0 right-0 z-[70] flex justify-center pointer-events-none opacity-0 transition-opacity duration-500">
+        <div id="toastMsg"
+            class="bg-blue-600 text-white px-8 py-4 rounded-full shadow-2xl text-2xl font-bold border-4 border-white">
+        </div>
+    </div>
+
+    <!-- Error Overlay -->
+    <div id="errorOverlay"
+        class="hidden absolute inset-0 bg-black z-[80] flex flex-col items-center justify-center text-red-500">
+        <h1 class="text-2xl font-bold">エラー</h1>
+        <p id="errorText">接続できませんでした</p>
+        <a href="index.html" class="mt-4 text-white underline">戻る</a>
+    </div>
+
+    <div id="debugInfo"
+        class="fixed bottom-0 right-0 bg-black/50 text-white text-[10px] p-1 z-[100] pointer-events-none font-mono">
+        Init...</div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        // Ensure roomId is uppercase
+        const roomId = (params.get('room') || '').toUpperCase();
+        const currentUser = params.get('user');
+
+        if (!roomId || !currentUser) window.location.href = 'index.html';
+        document.getElementById('roomIdDisp').innerText = roomId;
+
+        let player;
+        let currentStatus = 'init';
+        let currentSongId = null;
+        let currentSongData = null;
+        let currentSongAddedBy = null;
+        let buzzerUserId = null;
+        let playlist = {};
+        let wrongAnswers = {};
+        let isReady = false;
+        let buzzTimeout;
+        let currentStartTime = 0;
+        let wrongAnswerRecoveryTimer = null;
+        let currentHostName = null;
+        let handicapMode = false;
+        let serverTimeOffset = 0; // Difference between server and client time
+        // ★★★ 設定変数 ★★★
+        let currentPlayDuration = 30; // 曲再生時間（秒）
+        let currentAnswerTime = 15;   // 回答入力時間（秒）
+
+
+        window.onYouTubeIframeAPIReady = function () {
+            player = new YT.Player('player', {
+                height: '1',
+                width: '1',
+                videoId: '',
+                playerVars: {
+                    'playsinline': 1,
+                    'controls': 0,
+                    'disablekb': 1,
+                    'origin': window.location.origin,
+                    'modestbranding': 1,  // YouTubeロゴを最小化
+                    'rel': 0,             // 関連動画を非表示
+                    'showinfo': 0,        // 動画情報を非表示（旧パラメータだが念のため）
+                    'iv_load_policy': 3,  // アノテーションを非表示
+                    'fs': 0               // フルスクリーンボタンを非表示
+                },
+                events: { 'onReady': onPlayerReady, 'onError': onPlayerError, 'onStateChange': onPlayerStateChange }
+            });
+        };
+
+        // ★★★ MediaSession APIでスマホのコントロールパネルに表示される情報をダミーにする ★★★
+        // ダミーのAudio要素を使ってMediaSessionを奪取する
+        let dummyAudio = null;
+
+        function createDummyAudio() {
+            if (!dummyAudio) {
+                // 無音のBase64データ（1秒間の無音MP3）
+                const silentAudioBase64 = 'data:audio/mp3;base64,//uQxAAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+                dummyAudio = new Audio(silentAudioBase64);
+                dummyAudio.loop = true;
+                dummyAudio.volume = 0.01; // ほぼ無音
+            }
+            return dummyAudio;
+        }
+
+        function setDummyMediaSession() {
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: '🎵 イントロクイズ',
+                    artist: '俺達のイントロクイズ！',
+                    album: '問題再生中...',
+                    artwork: [
+                        { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%234F46E5" width="100" height="100"/><text x="50" y="60" font-size="40" text-anchor="middle" fill="white">🎵</text></svg>', sizes: '96x96', type: 'image/svg+xml' }
+                    ]
+                });
+                // メディアコントロールのボタンを無効化
+                navigator.mediaSession.setActionHandler('play', () => { });
+                navigator.mediaSession.setActionHandler('pause', () => { });
+                navigator.mediaSession.setActionHandler('seekbackward', () => { });
+                navigator.mediaSession.setActionHandler('seekforward', () => { });
+                navigator.mediaSession.setActionHandler('previoustrack', () => { });
+                navigator.mediaSession.setActionHandler('nexttrack', () => { });
+            }
+        }
+
+        // ダミーAudioを再生してMediaSessionを優先的に取得
+        function startDummyAudioForMediaSession() {
+            const audio = createDummyAudio();
+            audio.play().then(() => {
+                setDummyMediaSession();
+            }).catch(() => {
+                // 自動再生がブロックされた場合は無視
+            });
+        }
+
+        // 定期的にMediaSessionをダミー情報で上書き（YouTubeの上書きに対抗）
+        setInterval(() => {
+            if (currentStatus === 'playing' || currentStatus === 'buzzed') {
+                setDummyMediaSession();
+            }
+        }, 500);
+
+        // Track last sync time to avoid repeated seeks
+        let lastSyncStartTime = 0;
+
+        function onPlayerStateChange(event) {
+            // When video starts playing (state 1), re-sync to correct position
+            if (event.data === YT.PlayerState.PLAYING && currentStatus === 'playing' && window.lastStartTime) {
+                const serverStartTime = window.lastStartTime;
+                const correctedNow = Date.now() + serverTimeOffset;
+                const expectedElapsed = (correctedNow - serverStartTime) / 1000;
+                const actualPosition = player.getCurrentTime ? player.getCurrentTime() : 0;
+                const drift = Math.abs(expectedElapsed - actualPosition);
+
+                // If drift is more than 1 second, re-seek
+                if (drift > 1 && serverStartTime !== lastSyncStartTime) {
+                    console.log(`Re-sync: Expected=${expectedElapsed.toFixed(1)}s, Actual=${actualPosition.toFixed(1)}s, Drift=${drift.toFixed(1)}s`);
+                    player.seekTo(expectedElapsed, true);
+                    lastSyncStartTime = serverStartTime;
+                }
+            }
+        }
+
+        function onPlayerReady(event) {
+            isReady = true;
+            event.target.setVolume(100);
+            // スマホのコントロールパネルに曲情報が表示されないようダミー情報をセット
+            setDummyMediaSession();
+        }
+
+        function onPlayerError(event) {
+            console.error("Youtube Error", event.data);
+            // Only show error if we're actually playing a game
+            if (currentStatus === 'playing' && currentSongId) {
+                showToast(`⚠️ 再生エラー (スキップ)`, 'error');
+                if (isHost()) {
+                    setTimeout(() => {
+                        const song = playlist[currentSongId];
+                        const qCount = window.currentQuestionCount || 0;
+                        window.VibeQuiz.reportTimeUp(roomId, song ? song.titleMain : "???", song, qCount);
+                    }, 2000);
+                }
+            }
+        }
+
+        // ★★★ NEW: Unified host check function ★★★
+        function isHost() {
+            return currentHostName === currentUser;
+        }
+
+        function showToast(msg, type = 'info') {
+            const t = document.getElementById('toast');
+            const tm = document.getElementById('toastMsg');
+            tm.textContent = msg;
+            let bgClass = 'bg-blue-600';
+            if (type === 'success') bgClass = 'bg-green-600';
+            if (type === 'error') bgClass = 'bg-red-600';
+            tm.className = `px-8 py-4 rounded-full shadow-xl text-xl font-bold text-white border-4 border-white ${bgClass}`;
+            t.classList.remove('opacity-0');
+            setTimeout(() => t.classList.add('opacity-0'), 3000);
+        }
+
+        async function init() {
+            const overlay = document.getElementById('startOverlay');
+            overlay.onclick = async () => {
+                // ★ ダミーAudioを先に再生してMediaSessionを取得
+                startDummyAudioForMediaSession();
+
+                if (player && player.playVideo) {
+                    player.unMute();
+                    player.setVolume(100);
+                    player.playVideo();
+                    setTimeout(() => player.pauseVideo(), 500);
+                }
+                overlay.classList.add('hidden');
+
+                try {
+                    await window.VibeQuiz.joinRoom(roomId, currentUser);
+                    startSync();
+                } catch (e) {
+                    document.getElementById('errorOverlay').classList.remove('hidden');
+                    document.getElementById('errorText').innerText = e.message;
+                }
+            };
+        }
+
+        function startSync() {
+            const db = window.VibeQuiz.db;
+            const roomRef = db.ref(`rooms/${roomId}`);
+
+            // Get server time offset for sync
+            db.ref('.info/serverTimeOffset').once('value', snap => {
+                serverTimeOffset = snap.val() || 0;
+                console.log('Server time offset:', serverTimeOffset, 'ms');
+            });
+
+            roomRef.on('value', async snap => {
+                const data = snap.val();
+                // 部屋が削除された場合はロビーに戻る
+                if (!data) {
+                    alert("部屋が解散されました。ロビーに戻ります。");
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // ★★★ Store hostName from Firebase ★★★
+                currentHostName = data.hostName || null;
+
+                const settings = data.settings || {};
+                handicapMode = settings.handicapMode || false;
+                // ★ 設定を変数に保存 ★
+                currentPlayDuration = parseInt(settings.playDuration) || 30;
+                currentAnswerTime = parseInt(settings.answerTime) || 15;
+
+                // Support both new playlistIds and legacy playlistId
+                let playlistIds = settings.playlistIds || [settings.playlistId || 'global'];
+                if (!Array.isArray(playlistIds)) playlistIds = [playlistIds];
+
+                if (Object.keys(playlist).length === 0 && !window.isFetchingPlaylist) {
+                    window.isFetchingPlaylist = true;
+                    try {
+                        // Check if yaminabe is included
+                        if (playlistIds.includes('yaminabe')) {
+                            const globalSnap = await db.ref('playlist').once('value');
+                            playlist = { ...(globalSnap.val() || {}) };
+                            const allSnap = await db.ref('playlists').once('value');
+                            const allData = allSnap.val() || {};
+                            Object.values(allData).forEach(pl => {
+                                if (pl.songs) playlist = { ...playlist, ...pl.songs };
+                            });
+                        } else {
+                            // Fetch from selected playlists
+                            for (const plId of playlistIds) {
+                                if (plId === 'global') {
+                                    const snap = await db.ref('playlist').once('value');
+                                    playlist = { ...playlist, ...(snap.val() || {}) };
+                                } else {
+                                    const snap = await db.ref(`playlists/${plId}/songs`).once('value');
+                                    playlist = { ...playlist, ...(snap.val() || {}) };
+                                }
+                            }
+                        }
+                    } catch (e) { console.error("Pl Fetch Error", e); }
+                    window.isFetchingPlaylist = false;
+                }
+
+                const list = document.getElementById('participantsListHost');
+                list.innerHTML = '';
+                if (data.users) Object.entries(data.users).forEach(([uid, u]) => {
+                    const li = document.createElement('li');
+                    li.className = "p-2 bg-indigo-700 rounded text-sm font-bold text-white border border-indigo-500 shadow-sm flex justify-between items-center";
+                    // ホスト自身はキックボタンを表示しない
+                    if (isHost() && u.name !== currentUser) {
+                        li.innerHTML = `
+                            <span>${u.name} (${u.score || 0}pt)</span>
+                            <button onclick="kickUser('${uid}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs">✖</button>
+                        `;
+                    } else {
+                        const hostBadge = u.name === currentHostName ? ' 👑' : '';
+                        li.textContent = `${u.name}${hostBadge} (${u.score || 0}pt)`;
+                    }
+                    list.appendChild(li);
+                });
+
+                // Update compact scoreboard with tie handling
+                const compactList = document.getElementById('compactScoreList');
+                compactList.innerHTML = '';
+                if (data.users) {
+                    const sortedUsers = Object.values(data.users).sort((a, b) => (b.score || 0) - (a.score || 0));
+                    let currentRank = 1;
+                    let prevScore = null;
+                    sortedUsers.forEach((u, i) => {
+                        const li = document.createElement('li');
+                        li.className = 'flex justify-between items-center py-0.5';
+                        const score = u.score || 0;
+                        // 同率順位の計算: スコアが前と同じなら順位を維持
+                        if (prevScore !== null && score !== prevScore) {
+                            currentRank = i + 1;
+                        }
+                        prevScore = score;
+                        const medal = currentRank === 1 ? '🥇' : (currentRank === 2 ? '🥈' : (currentRank === 3 ? '🥉' : ''));
+                        li.innerHTML = `<span class="truncate">${medal}${u.name}</span><span class="font-bold text-yellow-400">${score}</span>`;
+                        compactList.appendChild(li);
+                    });
+                }
+
+                // Show/hide host control panel
+                const hostPanel = document.getElementById('hostControlPanel');
+                const settingsSection = document.getElementById('settingsSection');
+                if (isHost()) {
+                    hostPanel.classList.remove('hidden');
+                    document.getElementById('hostQCount').textContent = data.questionCount || 0;
+                    // 設定をUIに反映
+                    loadSettingsToUI(settings);
+                } else {
+                    hostPanel.classList.add('hidden');
+                    // 非ホストには設定セクションを非表示
+                    if (settingsSection) settingsSection.classList.add('hidden');
+                }
+
+                currentStatus = data.status || 'waiting';
+                buzzerUserId = data.buzzerUser;
+                currentSongId = data.currentSongId;
+                currentSongAddedBy = data.currentSongAddedBy || null;
+                wrongAnswers = data.wrongAnswers || {};
+                currentStartTime = data.startTime || 0;
+
+                const qCount = data.questionCount || 0;
+                window.currentQuestionCount = qCount;
+                const statusTxt = qCount > 0 ? `Q${qCount}: ${currentStatus.toUpperCase()}` : currentStatus.toUpperCase();
+                document.getElementById('statusDisplay').innerText = statusTxt;
+                document.getElementById('headerStatus').innerText = statusTxt;
+
+                if (data.message && data.message.timestamp > Date.now() - 5000) {
+                    showToast(data.message.text, data.message.type);
+                }
+
+                const msgText = data.message ? data.message.text.replace(/\n/g, '<br>') : '';
+                document.getElementById('messageBox').innerHTML = msgText;
+
+                syncUI(currentStatus, data);
+            });
+        }
+
+        function syncUI(status, data) {
+            const els = {
+                buzzer: document.getElementById('buzzBtn'),
+                ansArea: document.getElementById('answerArea'),
+                buzzerStatus: document.getElementById('buzzerStatus'),
+                timerBar: document.getElementById('timerBar'),
+                timerContainer: document.getElementById('timerContainer'),
+                rank: document.getElementById('rankingOverlay')
+            };
+
+            els.ansArea.classList.add('hidden');
+
+            if (status === 'waiting') {
+                els.rank.classList.add('hidden');
+                els.buzzer.classList.add('hidden');
+                document.getElementById('statusDisplay').innerText = "WAITING - ホスト待機中";
+                els.timerContainer.classList.add('hidden');
+                els.buzzerStatus.classList.add('hidden');
+                if (player && player.pauseVideo) player.pauseVideo();
+            }
+            else if (status === 'result') {
+                els.rank.classList.add('hidden');
+                els.buzzer.disabled = true;
+                els.buzzer.classList.remove('hidden');
+                els.timerContainer.classList.add('hidden');
+                els.buzzerStatus.classList.add('hidden');
+                if (player && player.pauseVideo) player.pauseVideo();
+            }
+            else if (status === 'playing') {
+                els.rank.classList.add('hidden');
+                if (buzzTimeout) { clearTimeout(buzzTimeout); buzzTimeout = null; }
+
+                els.buzzerStatus.classList.add('hidden');
+                els.buzzer.classList.remove('hidden');
+
+                // ★ 秒数表示をリセット ★
+                document.getElementById('myBuzzTime').classList.add('hidden');
+
+                els.timerContainer.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    const timerBar = document.getElementById('timerBar');
+                    timerBar.className = "h-full w-full bg-yellow-400";
+                    timerBar.style.transition = 'none';
+                    timerBar.style.width = '100%';
+                    setTimeout(() => {
+                        timerBar.style.transition = `width ${currentPlayDuration}s linear`;
+                        timerBar.style.width = '0%';
+                    }, 50);
+                });
+
+                if (wrongAnswers && wrongAnswers[currentUser]) {
+                    els.buzzer.disabled = true;
+                    els.buzzer.style.opacity = "0.5";
+                    els.buzzer.innerText = "❌";
+
+                    // ★★★ Use isHost() function ★★★
+                    if (isHost() && !wrongAnswerRecoveryTimer) {
+                        wrongAnswerRecoveryTimer = setTimeout(() => {
+                            if (currentStatus === 'playing') {
+                                window.VibeQuiz.clearWrongAnswers(roomId);
+                                showToast("回答権が復活しました！", 'info');
+                            }
+                            wrongAnswerRecoveryTimer = null;
+                        }, 10000);
+                    }
+                } else {
+                    els.buzzer.disabled = false;
+                    els.buzzer.style.opacity = "1";
+                    els.buzzer.innerText = "PUSH";
+                    els.buzzer.onclick = () => window.buzz();  // ★ onclick復元 ★
+                    if (wrongAnswerRecoveryTimer) { clearTimeout(wrongAnswerRecoveryTimer); wrongAnswerRecoveryTimer = null; }
+                }
+
+                if (currentSongId && playlist[currentSongId]) {
+                    currentSongData = playlist[currentSongId];
+                    if (player && player.loadVideoById) {
+                        const url = player.getVideoUrl ? player.getVideoUrl() : '';
+                        const videoId = currentSongData.youtubeId;
+
+                        if (!url || !url.includes(videoId)) {
+                            // Always start from the beginning for fair gameplay
+                            // (Sync seek was causing issues with buffering delay)
+                            player.loadVideoById({
+                                videoId: videoId,
+                                startSeconds: 0
+                            });
+                            player.setVolume(100);
+
+                            console.log(`Playing: ${videoId} from start`);
+                        } else {
+                            if (player.getPlayerState() !== 1) player.playVideo();
+                        }
+                    }
+                }
+            }
+            else if (status === 'buzzed') {
+                if (player && player.pauseVideo) player.pauseVideo();
+
+                const name = data.buzzerUser || '???';
+                document.getElementById('buzzerName').innerText = name;
+                els.buzzerStatus.classList.remove('hidden');
+
+                const timerBar = document.getElementById('timerBar');
+                timerBar.className = "h-full w-full bg-red-500";
+                requestAnimationFrame(() => {
+                    timerBar.style.transition = 'none';
+                    timerBar.style.width = '100%';
+                    setTimeout(() => {
+                        timerBar.style.transition = `width ${currentAnswerTime}s linear`;
+                        timerBar.style.width = '0%';
+                    }, 50);
+                });
+
+                // Countdown display
+                const timerSpan = document.getElementById('answerTimer');
+                let countdownVal = currentAnswerTime;
+                timerSpan.textContent = countdownVal;
+                timerSpan.className = 'text-black';
+
+                if (window.countdownInterval) clearInterval(window.countdownInterval);
+                window.countdownInterval = setInterval(() => {
+                    countdownVal--;
+                    if (countdownVal >= 0) {
+                        timerSpan.textContent = countdownVal;
+                        if (countdownVal <= 5) {
+                            timerSpan.className = 'text-red-600 font-extrabold text-xl animate-pulse';
+                        }
+                    } else {
+                        clearInterval(window.countdownInterval);
+                    }
+                }, 1000);
+
+                if (name === currentUser) {
+                    els.ansArea.classList.remove('hidden');
+                    els.buzzer.classList.add('hidden');  // 回答権獲得者はボタン非表示
+                    setTimeout(() => document.getElementById('answerInput').focus(), 100);
+
+                    if (buzzTimeout) clearTimeout(buzzTimeout);
+                    buzzTimeout = setTimeout(async () => {
+                        if (currentStatus === 'buzzed' && buzzerUserId === currentUser) {
+                            const time = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+                            try { await window.VibeQuiz.reportLoss(roomId, currentUser, time); } catch (e) { }
+                        }
+                    }, currentAnswerTime * 1000);
+                } else {
+                    // ★ 他の人はボタン表示のまま、押すと秒数表示 ★
+                    els.buzzer.disabled = false;
+                    els.buzzer.innerText = "⏳";
+                    els.buzzer.style.opacity = "0.7";
+                    els.buzzer.onclick = () => {
+                        // 秒数を表示するが、回答権は得られない
+                        const buzzTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+                        document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
+                        document.getElementById('myBuzzTime').classList.remove('hidden');
+                        // ボタンを押した後は無効化
+                        els.buzzer.disabled = true;
+                        els.buzzer.innerText = "✓";
+                    };
+                }
+            }
+            else if (status === 'completed') {
+                els.rank.classList.remove('hidden');
+                els.buzzerStatus.classList.add('hidden');
+                if (player && player.stopVideo) player.stopVideo();
+
+                const users = Object.values(data.users || {});
+                users.sort((a, b) => (b.score || 0) - (a.score || 0));
+                const ul = document.getElementById('rankingList');
+                ul.innerHTML = '';
+                let currentRank = 1;
+                let prevScore = null;
+                users.forEach((u, i) => {
+                    const li = document.createElement('li');
+                    li.className = "bg-indigo-800 p-4 rounded flex justify-between items-center text-xl font-bold border-2 border-indigo-600";
+                    const score = u.score || 0;
+                    // 同率順位の計算
+                    if (prevScore !== null && score !== prevScore) {
+                        currentRank = i + 1;
+                    }
+                    const isTied = prevScore !== null && score === prevScore;
+                    prevScore = score;
+
+                    const rankText = isTied ? `同率${currentRank}位` : `${currentRank}位`;
+                    if (currentRank === 1) {
+                        li.classList.add('border-yellow-400', 'text-yellow-400');
+                        li.innerHTML = `🥇 ${isTied ? '同率1位 ' : ''}${u.name} <span class="text-2xl">${score}pt</span>`;
+                    } else if (currentRank === 2) {
+                        li.innerHTML = `🥈 ${rankText} ${u.name} <span>${score}pt</span>`;
+                    } else if (currentRank === 3) {
+                        li.innerHTML = `🥉 ${rankText} ${u.name} <span>${score}pt</span>`;
+                    } else {
+                        li.innerHTML = `${rankText} ${u.name} <span>${score}pt</span>`;
+                    }
+                    ul.appendChild(li);
+                });
+
+                // ★★★ Display Question History with answer time ★★★
+                const historyList = document.getElementById('historyList');
+                historyList.innerHTML = '';
+                const history = data.history || {};
+                const historyArray = Object.values(history).sort((a, b) => a.questionNum - b.questionNum);
+
+                historyArray.forEach(h => {
+                    const div = document.createElement('div');
+                    div.className = "bg-indigo-800 p-3 rounded flex items-center space-x-3 border border-indigo-600";
+                    const timeDisplay = h.answerTime !== null && h.answerTime !== undefined
+                        ? `<span class="text-yellow-400 font-mono">${h.answerTime.toFixed(2)}秒</span>`
+                        : '';
+                    div.innerHTML = `
+                        <img src="${h.thumbnail || ''}" class="w-12 h-7 object-cover rounded bg-black flex-shrink-0">
+                        <div class="flex-grow min-w-0">
+                            <div class="text-xs text-gray-400">Q${h.questionNum}</div>
+                            <a href="https://www.youtube.com/watch?v=${h.youtubeId}" target="_blank" 
+                               class="text-sm font-bold text-white hover:text-pink-400 hover:underline truncate block">
+                                ${h.songTitle}
+                            </a>
+                        </div>
+                        <div class="text-xs text-right flex-shrink-0 ${h.winner ? 'text-green-400' : 'text-gray-500'}">
+                            ${h.winner ? '🎉 ' + h.winner : '時間切れ'}
+                            ${timeDisplay ? '<br>' + timeDisplay : ''}
+                        </div>
+                    `;
+                    historyList.appendChild(div);
+                });
+
+                // ★★★ High Speed Answer Ranking ★★★
+                const speedRankingArea = document.getElementById('speedRankingArea');
+                if (speedRankingArea) {
+                    speedRankingArea.innerHTML = '';
+
+                    // Filter answers with valid time and sort by speed
+                    const fastestAnswers = historyArray
+                        .filter(h => h.winner && h.answerTime !== null && h.answerTime !== undefined)
+                        .sort((a, b) => a.answerTime - b.answerTime)
+                        .slice(0, 5); // Top 5
+
+                    if (fastestAnswers.length > 0) {
+                        const speedTitle = document.createElement('h2');
+                        speedTitle.className = "text-xl font-bold text-yellow-400 mb-3 text-center";
+                        speedTitle.innerHTML = "⚡ 高速回答ランキング";
+                        speedRankingArea.appendChild(speedTitle);
+
+                        fastestAnswers.forEach((h, i) => {
+                            const div = document.createElement('div');
+                            div.className = "bg-gradient-to-r from-yellow-900/50 to-indigo-800 p-2 rounded flex items-center space-x-2 border border-yellow-600/50 mb-1";
+                            const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i + 1}.`));
+                            div.innerHTML = `
+                                <span class="text-lg">${medal}</span>
+                                <span class="font-bold text-white">${h.winner}</span>
+                                <span class="text-gray-400 text-xs truncate flex-grow">${h.songTitle}</span>
+                                <span class="font-mono text-yellow-400 font-bold">${h.answerTime.toFixed(2)}秒</span>
+                            `;
+                            speedRankingArea.appendChild(div);
+                        });
+                    }
+                }
+
+                // ★★★ Replay Button for Host, Wait Message for Others ★★★
+                const replayArea = document.getElementById('replayArea');
+                replayArea.innerHTML = '';
+                if (isHost()) {
+                    const replayBtn = document.createElement('button');
+                    replayBtn.className = "bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition active:scale-95";
+                    replayBtn.innerText = "🔄 もう一度遊ぶ";
+                    replayBtn.onclick = async () => {
+                        replayBtn.disabled = true;
+                        replayBtn.innerText = "リセット中...";
+                        await window.VibeQuiz.restartGame(roomId);
+                    };
+                    replayArea.appendChild(replayBtn);
+                } else {
+                    const waitMsg = document.createElement('div');
+                    waitMsg.className = "text-gray-400 text-center p-4";
+                    waitMsg.innerHTML = "⏳ ホストがリスタートするのを待っています...";
+                    replayArea.appendChild(waitMsg);
+                }
+            }
+        }
+
+        setInterval(() => {
+            if (player && player.getPlayerState) {
+                const state = player.getPlayerState();
+                const time = player.getCurrentTime ? player.getCurrentTime() : 0;
+                document.getElementById('debugInfo').innerText = `St:${state} T:${time.toFixed(1)} PL:${Object.keys(playlist).length}`;
+                if (state === 1 && time > currentPlayDuration) player.pauseVideo();
+            }
+        }, 500);
+
+        // ★★★ Use isHost() function ★★★
+        setInterval(() => {
+            if (isHost() && currentStatus === 'playing') {
+                let isTimeUp = false;
+                if (player && player.getCurrentTime && player.getCurrentTime() > currentPlayDuration + 0.5) isTimeUp = true;
+                if (currentStartTime && Date.now() - currentStartTime > (currentPlayDuration * 1000) + 2000) isTimeUp = true;
+
+                if (isTimeUp && !window.sentTimeUp) {
+                    const song = playlist[currentSongId];
+                    const qCount = window.currentQuestionCount || 0;
+                    window.sentTimeUp = true;
+                    window.VibeQuiz.reportTimeUp(roomId, song ? song.titleMain : "???", song, qCount);
+                    setTimeout(() => window.sentTimeUp = false, 8000);
+                }
+            }
+        }, 1000);
+
+        window.submitAnswer = async function () {
+            const val = document.getElementById('answerInput').value.trim();
+            document.getElementById('answerInput').value = '';
+            document.getElementById('answerArea').classList.add('hidden');
+            document.getElementById('answerInput').blur();
+
+            if (buzzTimeout) { clearTimeout(buzzTimeout); buzzTimeout = null; }
+
+            if (!currentSongData) {
+                showToast("曲データエラー", 'error');
+                await window.VibeQuiz.reportLoss(roomId, currentUser, 0);
+                return;
+            }
+
+            const nVal = normalize(val);
+            const mains = normalize(currentSongData.titleMain);
+            const hiras = normalize(currentSongData.titleHira || '');
+
+            if (nVal === mains || (hiras && nVal === hiras)) {
+                // 回答タイム（曲開始からの経過時間）を取得
+                const answerTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+                await window.VibeQuiz.reportWin(roomId, currentUser, currentSongId, currentSongData, answerTime);
+            } else {
+                const time = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+                await window.VibeQuiz.reportLoss(roomId, currentUser, time);
+            }
+        };
+
+        window.buzz = () => {
+            if (!wrongAnswers[currentUser]) {
+                // ★ 押した秒数を記録・表示 ★
+                const buzzTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+                document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
+                document.getElementById('myBuzzTime').classList.remove('hidden');
+
+                window.VibeQuiz.buzz(roomId, currentUser);
+            }
+        };
+        window.forceAudio = () => { if (player) { player.unMute(); player.setVolume(100); player.playVideo(); } };
+
+        function normalize(s) {
+            if (!s) return "";
+            return s.trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                .replace(/[\s\u3000!！?？、。,\.\-~～]/g, "").toLowerCase();
+        }
+
+        // ★★★ Host Control Functions ★★★
+        window.kickUser = (uid) => {
+            if (isHost()) {
+                window.VibeQuiz.removeUser(roomId, uid);
+            }
+        };
+
+        function setupHostControls() {
+            document.getElementById('hostStartBtn').addEventListener('click', async () => {
+                if (!isHost()) return;
+
+                // ★★★ 2人以上制限（ソロモード以外） ★★★
+                const roomSnap = await window.VibeQuiz.db.ref(`rooms/${roomId}`).once('value');
+                const roomData = roomSnap.val() || {};
+                const soloMode = roomData.settings?.soloMode || false;
+                const userCount = roomData.users ? Object.keys(roomData.users).length : 0;
+
+                if (!soloMode && userCount < 2) {
+                    showToast("2人以上でゲームを開始してください", 'error');
+                    return;
+                }
+
+                showToast("問題準備中...", 'info');
+                await window.VibeQuiz.nextQuestion(roomId);
+            });
+
+            document.getElementById('hostStopBtn').addEventListener('click', () => {
+                if (!isHost()) return;
+                window.VibeQuiz.stopGame(roomId);
+                showToast("ゲームを中断しました", 'info');
+            });
+
+            document.getElementById('hostFullResetBtn').addEventListener('click', () => {
+                if (!isHost()) return;
+                if (confirm("全てリセットしますか？\n（スコアと進行状況がリセットされます）")) {
+                    window.VibeQuiz.restartGame(roomId);
+                    showToast("全てリセットしました", 'info');
+                }
+            });
+
+            document.getElementById('hostSongResetBtn').addEventListener('click', () => {
+                if (!isHost()) return;
+                if (confirm("曲の進行だけリセットしますか？\n（スコアは維持されます）")) {
+                    window.VibeQuiz.resetGame(roomId);
+                    showToast("曲をリセットしました", 'info');
+                }
+            });
+
+            document.getElementById('hostDisbandBtn').addEventListener('click', async () => {
+                if (!isHost()) return;
+                if (confirm("部屋を解散しますか？\n全員がロビーに戻されます。")) {
+                    await window.VibeQuiz.db.ref(`rooms/${roomId}`).remove();
+                    localStorage.removeItem(`host_${roomId}`);
+                    window.location.href = 'index.html';
+                }
+            });
+        }
+
+        // Setup host controls after DOM is ready
+        setupHostControls();
+
+        // ★★★ 設定関連関数 ★★★
+        let settingsPanelOpen = true;
+
+        function toggleSettingsPanel() {
+            const panel = document.getElementById('settingsPanel');
+            const icon = document.getElementById('settingsToggleIcon');
+            settingsPanelOpen = !settingsPanelOpen;
+            if (settingsPanelOpen) {
+                panel.classList.remove('hidden');
+                icon.textContent = '▼';
+            } else {
+                panel.classList.add('hidden');
+                icon.textContent = '▶';
+            }
+        }
+
+        // 設定をUIに反映
+        function loadSettingsToUI(settings) {
+            if (!settings) return;
+
+            document.getElementById('settingMaxQuestions').value = settings.maxQuestions || 10;
+            document.getElementById('settingCorrectPoints').value = settings.correctPoints !== undefined ? settings.correctPoints : 1;
+            document.getElementById('settingWrongPoints').value = settings.wrongPoints !== undefined ? settings.wrongPoints : 0;
+            document.getElementById('settingPlayDuration').value = settings.playDuration || 30;
+            document.getElementById('settingAnswerTime').value = settings.answerTime || 15;
+            document.getElementById('settingHandicapMode').checked = settings.handicapMode || false;
+
+            // ハンデ戦詳細設定
+            document.getElementById('settingHandicapBonus').value = settings.handicapBonus !== undefined ? settings.handicapBonus : 2;
+            document.getElementById('settingHandicapPenalty').value = settings.handicapPenalty !== undefined ? settings.handicapPenalty : -1;
+            toggleHandicapSettings();
+
+            // プレイリストチェックボックスの状態を更新
+            const playlistIds = settings.playlistIds || ['global'];
+            document.querySelectorAll('#playlistCheckboxes input[type="checkbox"]').forEach(cb => {
+                cb.checked = playlistIds.includes(cb.value);
+            });
+        }
+
+        // ハンデ戦詳細設定の表示切替
+        function toggleHandicapSettings() {
+            const isChecked = document.getElementById('settingHandicapMode').checked;
+            const panel = document.getElementById('handicapSettings');
+            if (isChecked) {
+                panel.classList.remove('hidden');
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        // プレイリスト一覧を動的に読み込む
+        async function loadPlaylistOptions() {
+            const container = document.getElementById('playlistCheckboxes');
+            container.innerHTML = `
+                <label class="flex items-center text-xs cursor-pointer hover:bg-indigo-900 p-1 rounded">
+                    <input type="checkbox" value="global" onchange="saveRoomSettings()" class="mr-2 w-3 h-3 accent-pink-500">
+                    <span>Global (Default)</span>
+                </label>
+                <label class="flex items-center text-xs cursor-pointer hover:bg-indigo-900 p-1 rounded">
+                    <input type="checkbox" value="yaminabe" onchange="saveRoomSettings()" class="mr-2 w-3 h-3 accent-pink-500">
+                    <span>🍲 闇鍋モード (全曲)</span>
+                </label>
+            `;
+
+            try {
+                const playlists = await window.VibeQuiz.getPlaylists();
+                playlists.forEach(pl => {
+                    const label = document.createElement('label');
+                    label.className = "flex items-center text-xs cursor-pointer hover:bg-indigo-900 p-1 rounded";
+                    label.innerHTML = `
+                        <input type="checkbox" value="${pl.id}" onchange="saveRoomSettings()" class="mr-2 w-3 h-3 accent-pink-500">
+                        <span>${pl.name}</span>
+                    `;
+                    container.appendChild(label);
+                });
+            } catch (e) {
+                console.error("Playlist load error:", e);
+            }
+        }
+
+        // 設定を保存
+        async function saveRoomSettings() {
+            if (!isHost()) return;
+
+            const playlistCheckboxes = document.querySelectorAll('#playlistCheckboxes input[type="checkbox"]:checked');
+            const playlistIds = Array.from(playlistCheckboxes).map(cb => cb.value);
+
+            if (playlistIds.length === 0) {
+                showToast("プレイリストを最低1つ選択してください", "error");
+                document.querySelector('#playlistCheckboxes input[value="global"]').checked = true;
+                return;
+            }
+
+            const newSettings = {
+                maxQuestions: parseInt(document.getElementById('settingMaxQuestions').value),
+                correctPoints: parseInt(document.getElementById('settingCorrectPoints').value),
+                wrongPoints: parseInt(document.getElementById('settingWrongPoints').value),
+                playDuration: parseInt(document.getElementById('settingPlayDuration').value),
+                answerTime: parseInt(document.getElementById('settingAnswerTime').value),
+                handicapMode: document.getElementById('settingHandicapMode').checked,
+                handicapBonus: parseInt(document.getElementById('settingHandicapBonus').value),
+                handicapPenalty: parseInt(document.getElementById('settingHandicapPenalty').value),
+                playlistIds: playlistIds
+            };
+
+            try {
+                await window.VibeQuiz.updateRoomSettings(roomId, newSettings);
+                console.log("Settings saved:", newSettings);
+            } catch (e) {
+                console.error("Settings save error:", e);
+                showToast("設定保存エラー", "error");
+            }
+        }
+
+        // プレイリストのロード（初期化時に呼び出し）
+        loadPlaylistOptions();
+
+        init();
+    </script>
+</body>
+
+</html>

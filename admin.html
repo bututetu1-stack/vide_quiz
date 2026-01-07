@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>俺達のイントロクイズ！ - 管理画面</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 p-8">
+
+    <div class="max-w-4xl mx-auto mb-4 flex justify-between items-center text-sm text-gray-500">
+        <div>Host Panel</div>
+        <div class="font-bold text-indigo-600">ROOM: <span id="roomIdDisp">...</span></div>
+    </div>
+
+    <!-- Share Link -->
+    <div class="max-w-4xl mx-auto mb-8 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded relative">
+        <p class="font-bold">招待用リンク:</p>
+        <code id="shareLink"
+            class="block bg-white p-2 rounded mt-2 text-sm break-all select-all cursor-pointer">...</code>
+        <p class="text-xs mt-1 text-gray-500">※URLをコピーして参加者に送ってください</p>
+    </div>
+
+    <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        <!-- Controls -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden p-6 border-2 border-indigo-100">
+            <h1 class="text-xl font-bold mb-4 text-indigo-700">ゲーム進行 🛠️</h1>
+
+            <div class="grid gap-4">
+                <button id="startBtn"
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-6 px-4 rounded-xl text-xl shadow-lg transform active:scale-95 transition">
+                    ▶ ゲーム開始 / 次の問題
+                </button>
+                <div class="text-center text-sm text-gray-500">
+                    現在: 第<span id="qCount">0</span>問
+                </div>
+
+                <div class="border-t pt-4 mt-2 grid grid-cols-2 gap-4">
+                    <button id="stopBtn"
+                        class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">
+                        ⏸ 中断
+                    </button>
+                    <button id="resetBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        🔄 部屋リセット
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <h3 class="font-bold text-gray-400 text-xs">LOGS</h3>
+                <div id="logs" class="h-32 overflow-y-auto bg-black text-green-400 text-xs p-2 rounded"></div>
+            </div>
+        </div>
+
+        <!-- Participants -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden p-6 border-2 border-indigo-100">
+            <h2 class="text-xl font-bold mb-4 text-indigo-700 flex justify-between">
+                参加者
+                <span class="bg-indigo-100 text-indigo-800 text-sm py-1 px-3 rounded-full"><span
+                        id="userCount">0</span>人</span>
+            </h2>
+            <div class="bg-gray-100 rounded-xl p-4 h-96 overflow-y-auto">
+                <ul id="participantsList" class="space-y-2"></ul>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const roomId = params.get('room');
+        const hostName = params.get('host');
+
+        // Security Check
+        if (!roomId || localStorage.getItem(`host_${roomId}`) !== 'true') {
+            alert("権限がありません！");
+            window.location.href = 'index.html';
+        }
+
+        document.getElementById('roomIdDisp').innerText = roomId;
+        // Build Share Link (Assuming same domain)
+        const shareUrl = `${window.location.origin}${window.location.pathname.replace('admin.html', 'index.html')}?join=${roomId}`;
+        // Actually point to index logic if I added auto-fill to index, 
+        // OR direct to quiz if users know how to enter name. 
+        // Let's just give them the ID for now as index.html expects manual input.
+        // Update index.html later one day to handle ?join param.
+        document.getElementById('shareLink').innerText = `合言葉: ${roomId}\n(URL: ${window.location.origin}/index.html)`;
+
+        function log(msg) {
+            const el = document.getElementById('logs');
+            const line = document.createElement('div');
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            el.prepend(line);
+        }
+
+        async function init() {
+            if (!window.VibeQuiz) { setTimeout(init, 500); return; }
+            const db = window.VibeQuiz.db;
+
+            // Sync Users
+            db.ref(`rooms/${roomId}/users`).on('value', snap => {
+                const list = document.getElementById('participantsList');
+                list.innerHTML = '';
+                const users = snap.val() || {};
+                document.getElementById('userCount').textContent = Object.keys(users).length;
+
+                Object.entries(users).forEach(([key, u]) => {
+                    const li = document.createElement('li');
+                    li.className = "flex justify-between items-center p-2 bg-gray-50 rounded border text-sm";
+                    li.innerHTML = `
+                        <span class="font-bold flex-grow">${u.name}</span>
+                        <span class="font-mono mr-2">${u.score || 0}pt</span>
+                        <button onclick="kick('${key}')" class="bg-red-500 text-white px-2 py-1 rounded text-xs">✖</button>
+                     `;
+                    list.appendChild(li);
+                });
+            });
+
+            // Sync Q Count
+            db.ref(`rooms/${roomId}/questionCount`).on('value', s => document.getElementById('qCount').innerText = s.val() || 0);
+
+            // Access
+            window.kick = (uid) => window.VibeQuiz.removeUser(roomId, uid);
+
+            document.getElementById('startBtn').addEventListener('click', async () => {
+                log("Starting...");
+                await window.VibeQuiz.nextQuestion(roomId);
+            });
+            document.getElementById('stopBtn').addEventListener('click', () => window.VibeQuiz.stopGame(roomId));
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                if (confirm("リセットしますか？")) window.VibeQuiz.resetGame(roomId);
+            });
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

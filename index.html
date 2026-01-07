@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>俺達のイントロクイズ！ - ロビー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-indigo-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="text-center mb-10">
+        <h1 class="text-5xl md:text-7xl font-bold text-yellow-400 title-shadow mb-2">俺達の<br>イントロクイズ！</h1>
+        <p class="text-pink-300 font-bold tracking-widest">ONLINE V4</p>
+    </div>
+
+    <!-- ニックネーム入力（共通） -->
+    <div class="w-full max-w-md mb-8">
+        <div class="bg-indigo-800 p-6 rounded-2xl border-4 border-yellow-500 shadow-2xl">
+            <label class="block text-sm text-gray-300 mb-2 text-center">👤 あなたのニックネーム</label>
+            <input type="text" id="nickname" placeholder="表示名を入力"
+                class="w-full p-4 rounded-lg bg-indigo-950 border-2 border-yellow-500 text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-yellow-400">
+            <p class="text-xs text-gray-400 text-center mt-2">このニックネームは統計やランキングに使用されます</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-4xl">
+
+        <!-- Join Room -->
+        <div class="bg-indigo-800 p-5 rounded-2xl border-4 border-blue-500 shadow-2xl flex flex-col items-center">
+            <h2 class="text-xl font-bold mb-3 text-blue-300">🎮 部屋に参加</h2>
+            <div class="w-full space-y-2">
+                <div>
+                    <label class="block text-xs text-gray-300 mb-1">合言葉（非公開部屋用）</label>
+                    <input type="text" id="joinRoomId" placeholder="例: ABC123"
+                        class="w-full p-2 rounded-lg bg-indigo-950 border border-blue-500 text-center text-lg font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-400">
+                </div>
+                <button onclick="joinRoom()"
+                    class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-xl font-bold text-lg shadow-lg transform active:scale-95 transition">
+                    参加する 🚀
+                </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">公開部屋は下の一覧から参加</p>
+        </div>
+
+        <!-- Create Room -->
+        <div class="bg-indigo-800 p-5 rounded-2xl border-4 border-pink-500 shadow-2xl flex flex-col items-center">
+            <h2 class="text-xl font-bold mb-3 text-pink-300">👑 部屋を作る</h2>
+            <div class="w-full space-y-2">
+                <div>
+                    <label class="block text-xs text-gray-300 mb-1">部屋名</label>
+                    <input type="text" id="roomName" placeholder="楽しくやろう！"
+                        class="w-full p-2 rounded-lg bg-indigo-950 border border-pink-500 text-center text-sm focus:outline-none focus:ring-2 focus:ring-pink-400">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-300 mb-1">公開設定</label>
+                    <select id="roomVisibility" onchange="toggleRoomIdField()"
+                        class="w-full p-2 rounded-lg bg-indigo-950 border border-pink-500 text-sm">
+                        <option value="private">🔒 非公開（合言葉で参加）</option>
+                        <option value="public">🌐 公開（誰でも参加可）</option>
+                    </select>
+                </div>
+                <div id="roomIdField">
+                    <label class="block text-xs text-gray-300 mb-1">合言葉（空欄で自動）</label>
+                    <input type="text" id="customRoomId" placeholder="例: SAIKYOU"
+                        class="w-full p-2 rounded-lg bg-indigo-950 border border-pink-500 text-center text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-pink-400">
+                </div>
+                <button onclick="createRoom()"
+                    class="w-full bg-pink-500 hover:bg-pink-600 py-3 rounded-xl font-bold text-lg shadow-lg transform active:scale-95 transition">
+                    作成する ✨
+                </button>
+            </div>
+        </div>
+
+        <!-- Solo Mode -->
+        <div class="bg-indigo-800 p-5 rounded-2xl border-4 border-green-500 shadow-2xl flex flex-col items-center">
+            <h2 class="text-xl font-bold mb-3 text-green-300">🎯 ソロで練習</h2>
+            <p class="text-xs text-gray-400 text-center mb-3">ランキングには反映されません</p>
+            <button onclick="createSoloRoom()"
+                class="w-full bg-green-600 hover:bg-green-700 py-3 rounded-xl font-bold text-lg shadow-lg transform active:scale-95 transition">
+                練習スタート 🚀
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Find Public Rooms -->
+    <div class="mt-6 w-full max-w-4xl">
+        <button onclick="togglePublicRooms()" id="publicRoomsToggle"
+            class="w-full bg-indigo-800 hover:bg-indigo-700 py-3 rounded-xl font-bold text-lg border border-indigo-600">
+            🔍 公開部屋を探す ▼
+        </button>
+        <div id="publicRoomsList"
+            class="hidden mt-2 bg-indigo-900/80 rounded-xl p-4 border border-indigo-600 max-h-64 overflow-y-auto">
+            <div id="publicRoomsContent" class="space-y-2">
+                <p class="text-gray-400 text-center">読み込み中...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Links -->
+    <div class="mt-12 flex flex-wrap justify-center gap-4">
+        <a href="playlist.html" class="flex items-center text-gray-300 hover:text-white transition">
+            <span class="bg-gray-700 p-2 rounded-full mr-2">🎵</span> プレイリスト管理
+        </a>
+        <button onclick="openStatsModal()"
+            class="flex items-center text-gray-300 hover:text-white transition bg-transparent border-none cursor-pointer">
+            <span class="bg-purple-700 p-2 rounded-full mr-2">📊</span> 統計を見る
+        </button>
+    </div>
+
+    <!-- Stats Modal -->
+    <div id="statsModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+        <div
+            class="bg-indigo-900 rounded-2xl border-4 border-purple-500 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b border-purple-500">
+                <h2 class="text-2xl font-bold text-purple-300">📊 統計ダッシュボード</h2>
+                <button onclick="closeStatsModal()" class="text-2xl hover:text-red-400">✖</button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex border-b border-purple-500">
+                <button onclick="showStatsTab('user')" id="tabUser"
+                    class="flex-1 py-3 text-center font-bold bg-purple-600 border-r border-purple-500">👤 ユーザー</button>
+                <button onclick="showStatsTab('song')" id="tabSong"
+                    class="flex-1 py-3 text-center font-bold hover:bg-purple-600/50 border-r border-purple-500">🎵
+                    曲統計</button>
+                <button onclick="showStatsTab('ranking')" id="tabRanking"
+                    class="flex-1 py-3 text-center font-bold hover:bg-purple-600/50">🏆 ランキング</button>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <!-- User Stats Tab -->
+                <div id="statsUser" class="stats-tab">
+                    <!-- 自分の統計 -->
+                    <div class="mb-4">
+                        <button onclick="loadMyStats()"
+                            class="w-full bg-green-600 hover:bg-green-700 py-3 rounded-lg font-bold mb-3">
+                            👤 自分の統計を見る
+                        </button>
+                    </div>
+                    <div id="myStatsResult" class="mb-4"></div>
+
+                    <!-- ユーザー検索 -->
+                    <div class="border-t border-purple-500 pt-4">
+                        <label class="block text-sm text-gray-300 mb-1">ユーザー名で検索（部分一致）</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="statsSearchUser" placeholder="ユーザー名"
+                                class="flex-1 p-2 rounded bg-indigo-950 border border-purple-500">
+                            <button onclick="searchUserStats()"
+                                class="bg-purple-600 hover:bg-purple-700 px-4 rounded font-bold">検索</button>
+                        </div>
+                    </div>
+                    <div id="userStatsResult" class="space-y-2 mt-3"></div>
+                </div>
+
+                <!-- Song Stats Tab -->
+                <div id="statsSong" class="stats-tab hidden">
+                    <div id="songStatsList" class="space-y-2">
+                        <p class="text-gray-400 text-center">読み込み中...</p>
+                    </div>
+                </div>
+
+                <!-- Ranking Tab -->
+                <div id="statsRanking" class="stats-tab hidden">
+                    <h3 class="text-lg font-bold text-yellow-400 mb-3">🏆 順位ポイントランキング</h3>
+                    <p class="text-xs text-gray-400 mb-2">ゲーム終了時: 1位=10pt, 2位=5pt, 3位=2pt</p>
+                    <div id="rankPointsRankingList" class="space-y-2 mb-6"></div>
+
+                    <h3 class="text-lg font-bold text-green-400 mb-3">✅ 総合正解数ランキング</h3>
+                    <div id="correctRankingList" class="space-y-2 mb-6"></div>
+
+                    <h3 class="text-lg font-bold text-blue-400 mb-3">🎯 累計ポイントランキング</h3>
+                    <p class="text-xs text-gray-400 mb-2">ゲーム中の正解で獲得したポイント</p>
+                    <div id="pointsRankingList" class="space-y-2 mb-6"></div>
+
+                    <h3 class="text-lg font-bold text-pink-400 mb-3">⚡ 高速回答ランキング</h3>
+                    <div id="speedRankingList" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Init Check
+        function init() {
+            // ニックネームをlocalStorageから復元
+            const savedNickname = localStorage.getItem('vibeQuizNickname');
+            if (savedNickname) {
+                document.getElementById('nickname').value = savedNickname;
+            }
+
+            // ニックネーム変更時にlocalStorageに保存
+            document.getElementById('nickname').addEventListener('input', function () {
+                localStorage.setItem('vibeQuizNickname', this.value.trim());
+            });
+        }
+        init();
+
+        // ★ 公開設定変更時に合言葉欄を表示/非表示 ★
+        function toggleRoomIdField() {
+            const visibility = document.getElementById('roomVisibility').value;
+            const roomIdField = document.getElementById('roomIdField');
+            if (visibility === 'public') {
+                roomIdField.classList.add('hidden');
+            } else {
+                roomIdField.classList.remove('hidden');
+            }
+        }
+
+        // 参加用関数（合言葉 = Room ID）
+        function joinRoom() {
+            const nickname = document.getElementById('nickname').value.trim();
+            const roomId = document.getElementById('joinRoomId').value.trim().toUpperCase();
+
+            if (!nickname) { alert("ニックネームを入力してください"); return; }
+            if (!roomId) { alert("合言葉を入力してください"); return; }
+
+            localStorage.setItem('vibeQuizNickname', nickname);
+            window.location.href = `quiz.html?room=${roomId}&user=${encodeURIComponent(nickname)}`;
+        }
+
+        // 部屋作成関数
+        async function createRoom() {
+            const nickname = document.getElementById('nickname').value.trim();
+            const customId = document.getElementById('customRoomId').value.trim().toUpperCase();
+            const roomName = document.getElementById('roomName').value.trim() || `${nickname}の部屋`;
+            const visibility = document.getElementById('roomVisibility').value;
+
+            if (!nickname) { alert("ニックネームを入力してください"); return; }
+
+            try {
+                if (!window.VibeQuiz) { alert("Firebase読込中... 数秒待ってね"); return; }
+
+                localStorage.setItem('vibeQuizNickname', nickname);
+
+                // 公開部屋の場合は合言葉自動生成、非公開は指定or自動
+                const roomId = await window.VibeQuiz.createRoom(nickname, {
+                    maxQuestions: 10,
+                    playlistIds: ['global'],
+                    handicapMode: false,
+                    correctPoints: 1,
+                    wrongPoints: 0,
+                    playDuration: 30,
+                    answerTime: 15,
+                    soloMode: false,
+                    roomName: roomName,
+                    visibility: visibility
+                }, (visibility === 'public') ? null : (customId || null));
+
+                if (visibility === 'private') {
+                    alert(`非公開部屋を作成しました！\n合言葉: ${roomId}\n友達にこの合言葉を伝えてください`);
+                } else {
+                    alert(`公開部屋を作成しました！\n誰でも参加できます`);
+                }
+
+                localStorage.setItem(`host_${roomId}`, 'true');
+
+                window.location.href = `quiz.html?room=${roomId}&user=${encodeURIComponent(nickname)}`;
+            } catch (e) {
+                alert("作成エラーが発生しました:\n" + e.message);
+            }
+        }
+
+        // ソロモード作成関数
+        async function createSoloRoom() {
+            const nickname = document.getElementById('nickname').value.trim();
+
+            if (!nickname) { alert("ニックネームを入力してください"); return; }
+
+            try {
+                if (!window.VibeQuiz) { alert("Firebase読込中... 数秒待ってね"); return; }
+
+                localStorage.setItem('vibeQuizNickname', nickname);
+
+                const roomId = await window.VibeQuiz.createRoom(nickname, {
+                    maxQuestions: 10,
+                    playlistIds: ['global'],
+                    handicapMode: false,
+                    correctPoints: 1,
+                    wrongPoints: 0,
+                    playDuration: 30,
+                    answerTime: 15,
+                    soloMode: true,
+                    roomName: 'ソロ練習',
+                    visibility: 'private',
+                    password: null
+                }, null);
+
+                localStorage.setItem(`host_${roomId}`, 'true');
+
+                window.location.href = `quiz.html?room=${roomId}&user=${encodeURIComponent(nickname)}`;
+            } catch (e) {
+                alert("作成エラーが発生しました:\n" + e.message);
+            }
+        }
+
+        // 公開部屋一覧の表示切替
+        function togglePublicRooms() {
+            const list = document.getElementById('publicRoomsList');
+            list.classList.toggle('hidden');
+            if (!list.classList.contains('hidden')) {
+                loadPublicRooms();
+            }
+        }
+
+        // 公開部屋一覧をロード
+        async function loadPublicRooms() {
+            const content = document.getElementById('publicRoomsContent');
+            content.innerHTML = '<p class="text-gray-400 text-center">読み込み中...</p>';
+
+            try {
+                if (!window.VibeQuiz) { return; }
+                const rooms = await window.VibeQuiz.getPublicRooms();
+
+                if (rooms.length === 0) {
+                    content.innerHTML = '<p class="text-gray-400 text-center">公開部屋はありません</p>';
+                    return;
+                }
+
+                content.innerHTML = rooms.map(r => {
+                    const statusText = r.status === 'waiting' ? '🟢 待機中' : (r.status === 'playing' || r.status === 'buzzed' ? '🔴 対戦中' : '⚪ 終了');
+                    const userCount = r.userCount || 0;
+                    return `
+                    <div class="bg-indigo-800 p-3 rounded flex justify-between items-center">
+                        <div>
+                            <div class="font-bold text-white">${r.roomName}</div>
+                            <div class="text-xs text-gray-400">${statusText} | ${userCount}人参加 | by ${r.hostName}</div>
+                        </div>
+                        <button onclick="joinPublicRoom('${r.roomId}')" 
+                            class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm font-bold">
+                            ${r.status === 'waiting' ? '参加' : '観戦'}
+                        </button>
+                    </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                content.innerHTML = '<p class="text-red-400 text-center">エラーが発生しました</p>';
+            }
+        }
+
+        // 公開部屋に参加（合言葉不要）
+        function joinPublicRoom(roomId) {
+            const nickname = document.getElementById('nickname').value.trim();
+            if (!nickname) { alert("ニックネームを入力してください"); return; }
+
+            localStorage.setItem('vibeQuizNickname', nickname);
+            window.location.href = `quiz.html?room=${roomId}&user=${encodeURIComponent(nickname)}`;
+        }
+
+        // ★★★ 統計モーダル機能 ★★★
+        function openStatsModal() {
+            document.getElementById('statsModal').classList.remove('hidden');
+            showStatsTab('user');
+        }
+
+        function closeStatsModal() {
+            document.getElementById('statsModal').classList.add('hidden');
+        }
+
+        function showStatsTab(tab) {
+            // Hide all tabs
+            document.querySelectorAll('.stats-tab').forEach(el => el.classList.add('hidden'));
+            // Remove active from all tab buttons
+            document.querySelectorAll('[id^="tab"]').forEach(el => {
+                el.classList.remove('bg-purple-600');
+                el.classList.add('hover:bg-purple-600/50');
+            });
+
+            // Show selected tab
+            if (tab === 'user') {
+                document.getElementById('statsUser').classList.remove('hidden');
+                document.getElementById('tabUser').classList.add('bg-purple-600');
+            } else if (tab === 'song') {
+                document.getElementById('statsSong').classList.remove('hidden');
+                document.getElementById('tabSong').classList.add('bg-purple-600');
+                loadSongStats();
+            } else if (tab === 'ranking') {
+                document.getElementById('statsRanking').classList.remove('hidden');
+                document.getElementById('tabRanking').classList.add('bg-purple-600');
+                loadRankings();
+            }
+        }
+
+        // 自分の統計を表示
+        async function loadMyStats() {
+            const result = document.getElementById('myStatsResult');
+            result.innerHTML = '<p class="text-gray-400">読み込み中...</p>';
+
+            try {
+                const stats = await window.VibeQuiz.getMyStats();
+                if (!stats) {
+                    result.innerHTML = '<p class="text-gray-400">まだプレイ記録がありません。ゲームをプレイすると統計が表示されます！</p>';
+                    return;
+                }
+
+                result.innerHTML = renderUserStats(stats.displayName || '自分', stats);
+            } catch (e) {
+                result.innerHTML = '<p class="text-red-400">エラーが発生しました</p>';
+            }
+        }
+
+        async function searchUserStats() {
+            const name = document.getElementById('statsSearchUser').value.trim();
+            if (!name) return;
+
+            const result = document.getElementById('userStatsResult');
+            result.innerHTML = '<p class="text-gray-400">検索中...</p>';
+
+            try {
+                const users = await window.VibeQuiz.searchUserStats(name);
+                if (users.length === 0) {
+                    result.innerHTML = '<p class="text-gray-400">ユーザーが見つかりませんでした</p>';
+                    return;
+                }
+
+                result.innerHTML = users.map(u => renderUserStats(u.name, u)).join('');
+            } catch (e) {
+                result.innerHTML = '<p class="text-red-400">エラーが発生しました</p>';
+            }
+        }
+
+        function renderUserStats(name, stats) {
+            const accuracy = (stats.totalCorrect || 0) + (stats.totalWrong || 0) > 0
+                ? Math.round((stats.totalCorrect || 0) / ((stats.totalCorrect || 0) + (stats.totalWrong || 0)) * 100)
+                : 0;
+
+            let fastList = '';
+            if (stats.fastAnswers && stats.fastAnswers.length > 0) {
+                fastList = stats.fastAnswers.map((fa, i) =>
+                    `<div class="text-sm flex justify-between"><span class="truncate">${i + 1}. ${fa.songTitle}</span><span
+                class="text-yellow-400">${fa.time.toFixed(2)}秒</span></div>`
+                ).join('');
+            }
+
+            return `
+        <div class="bg-indigo-800 p-4 rounded-lg border border-purple-500 mb-2">
+            <h3 class="text-xl font-bold text-white mb-3">👤 ${name}</h3>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                <div class="bg-indigo-950 p-2 rounded">
+                    <div class="text-gray-400">正解数</div>
+                    <div class="text-xl font-bold text-green-400">${stats.totalCorrect || 0}</div>
+                </div>
+                <div class="bg-indigo-950 p-2 rounded">
+                    <div class="text-gray-400">不正解数</div>
+                    <div class="text-xl font-bold text-red-400">${stats.totalWrong || 0}</div>
+                </div>
+                <div class="bg-indigo-950 p-2 rounded">
+                    <div class="text-gray-400">正答率</div>
+                    <div class="text-xl font-bold text-blue-400">${accuracy}%</div>
+                </div>
+                <div class="bg-indigo-950 p-2 rounded">
+                    <div class="text-gray-400">累計ポイント</div>
+                    <div class="text-xl font-bold text-yellow-400">${stats.totalPoints || 0}pt</div>
+                </div>
+            </div>
+            ${stats.fastestAnswer ? `<div class="mt-3 text-sm">⚡ 最速回答: <span
+                    class="text-yellow-400 font-bold">${stats.fastestAnswer.toFixed(2)}秒</span></div>` : ''}
+            ${fastList ? `<div class="mt-3">
+                <div class="text-sm text-gray-400 mb-1">🏆 高速回答Top5:</div>${fastList}
+            </div>` : ''}
+        </div>
+        `;
+        }
+
+        async function loadSongStats() {
+            const list = document.getElementById('songStatsList');
+            list.innerHTML = '<p class="text-gray-400 text-center">読み込み中...</p>';
+
+            try {
+                const songs = await window.VibeQuiz.getSongStats();
+                if (songs.length === 0) {
+                    list.innerHTML = '<p class="text-gray-400 text-center">まだデータがありません</p>';
+                    return;
+                }
+
+                // Sort by times played
+                songs.sort((a, b) => (b.timesPlayed || 0) - (a.timesPlayed || 0));
+
+                list.innerHTML = songs.slice(0, 20).map(s => `
+        <div class="bg-indigo-800 p-3 rounded flex justify-between items-center text-sm">
+            <div class="truncate flex-1 mr-2">
+                <div class="font-bold">${s.titleMain || '???'}</div>
+                <div class="text-xs text-gray-400">
+                    出題${s.timesPlayed || 0}回 | 正解率${s.correctRate}%
+                    ${s.averageAnswerTime ? ` | 平均${s.averageAnswerTime.toFixed(2)}秒` : ''}
+                </div>
+            </div>
+            ${s.fastestAnswer ? `<div class="text-xs text-right">
+                <div class="text-yellow-400">⚡ ${s.fastestAnswer.time.toFixed(2)}秒</div>
+                <div class="text-gray-400">${s.fastestAnswer.user}</div>
+            </div>` : ''}
+        </div>
+        `).join('');
+            } catch (e) {
+                list.innerHTML = '<p class="text-red-400 text-center">エラーが発生しました</p>';
+            }
+        }
+
+        async function loadRankings() {
+            const rankPointsList = document.getElementById('rankPointsRankingList');
+            const correctList = document.getElementById('correctRankingList');
+            const pointsList = document.getElementById('pointsRankingList');
+            const speedList = document.getElementById('speedRankingList');
+
+            try {
+                const users = await window.VibeQuiz.getAllUserStats();
+
+                // ★ 今週の開始日を計算（月曜0時）★
+                const now = new Date();
+                const dayOfWeek = now.getDay();
+                const weekStart = new Date(now);
+                weekStart.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+                weekStart.setHours(0, 0, 0, 0);
+                const weekStartTime = weekStart.getTime();
+
+                // 順位ポイントランキング（★今週分のみ表示★）
+                const rankPointsSorted = [...users]
+                    .filter(u => (u.weekStart || 0) >= weekStartTime && (u.weeklyRankPoints || 0) > 0)
+                    .sort((a, b) => (b.weeklyRankPoints || 0) - (a.weeklyRankPoints || 0));
+                rankPointsList.innerHTML = rankPointsSorted.slice(0, 5).map((u, i) => {
+                    const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i + 1}.`));
+                    return `
+        <div class="bg-indigo-800 p-2 rounded flex justify-between items-center">
+            <span><span class="text-lg mr-2">${medal}</span> ${u.name}</span>
+            <span class="text-yellow-400 font-bold">${u.weeklyRankPoints || 0}pt</span>
+        </div>
+        `;
+                }).join('') || '<p class="text-gray-400 text-center">まだデータがありません</p>';
+
+                // 正解数ランキング
+                const correctSorted = [...users].sort((a, b) => (b.totalCorrect || 0) - (a.totalCorrect || 0));
+                correctList.innerHTML = correctSorted.slice(0, 5).map((u, i) => {
+                    const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i + 1}.`));
+                    return `
+        <div class="bg-indigo-800 p-2 rounded flex justify-between items-center">
+            <span><span class="text-lg mr-2">${medal}</span> ${u.name}</span>
+            <span class="text-green-400 font-bold">${u.totalCorrect || 0}回</span>
+        </div>
+        `;
+                }).join('') || '<p class="text-gray-400 text-center">まだデータがありません</p>';
+
+                // 累計ポイントランキング
+                users.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+                pointsList.innerHTML = users.slice(0, 5).map((u, i) => {
+                    const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i + 1}.`));
+                    return `
+        <div class="bg-indigo-800 p-2 rounded flex justify-between items-center">
+            <span><span class="text-lg mr-2">${medal}</span> ${u.name}</span>
+            <span class="text-blue-400 font-bold">${u.totalPoints || 0}pt</span>
+        </div>
+        `;
+                }).join('') || '<p class="text-gray-400 text-center">まだデータがありません</p>';
+
+                // Speed Ranking
+                const speedRanking = await window.VibeQuiz.getSpeedRanking();
+                speedList.innerHTML = speedRanking.map((s, i) => {
+                    const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i + 1}.`));
+                    return `
+        <div class="bg-indigo-800 p-2 rounded flex justify-between items-center text-sm">
+            <span><span class="text-lg mr-2">${medal}</span> ${s.user}</span>
+            <span class="truncate mx-2 text-gray-400">${s.songTitle}</span>
+            <span class="text-yellow-400 font-bold">${s.time.toFixed(2)}秒</span>
+        </div>
+        `;
+                }).join('') || '<p class="text-gray-400 text-center">まだデータがありません</p>';
+            } catch (e) {
+                pointsList.innerHTML = '<p class="text-red-400 text-center">エラーが発生しました</p>';
+            }
+        }
+
+    </script>
+    <!-- joinRoom script removed - using HTML form submission instead -->
+</body>
+
+</html>

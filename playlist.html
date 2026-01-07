@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>俺達のイントロクイズ！ - プレイリスト管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1b4b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4f46e5;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body class="bg-indigo-900 text-white min-h-screen flex flex-col">
+
+    <header class="bg-indigo-800 p-4 border-b border-indigo-600 flex justify-between items-center z-10">
+        <h1 class="font-bold text-xl text-yellow-400 flex items-center">
+            <span class="text-2xl mr-2">🎵</span> プレイリスト管理
+        </h1>
+        <a href="index.html" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-sm font-bold">🏠 ロビーに戻る</a>
+    </header>
+
+    <div class="flex-grow flex overflow-hidden">
+
+        <!-- Sidebar: Playlist Selector -->
+        <div class="w-64 bg-indigo-950 flex flex-col border-r border-indigo-800">
+            <div class="p-4 border-b border-indigo-800">
+                <button onclick="createPlaylist()"
+                    class="w-full bg-pink-600 hover:bg-pink-700 text-white py-2 rounded font-bold shadow text-sm">
+                    ＋ 新規プレイリスト
+                </button>
+            </div>
+            <div class="flex-grow overflow-y-auto p-2 space-y-2">
+                <div onclick="selectPlaylist('global', 'Global (Default)')" id="pl-global"
+                    class="p-3 rounded cursor-pointer transition hover:bg-indigo-800 bg-indigo-700 border-l-4 border-yellow-400">
+                    <div class="font-bold text-sm">Global (Default)</div>
+                    <div class="text-[10px] text-gray-400">標準プレイリスト</div>
+                </div>
+                <div id="playlistList" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-grow flex flex-col md:flex-row overflow-hidden bg-gray-900">
+
+            <!-- Add Song Form -->
+            <div class="w-full md:w-1/3 p-6 bg-gray-800 overflow-y-auto border-r border-gray-700">
+                <h2 class="text-lg font-bold mb-4 text-green-400 border-b border-gray-600 pb-2">曲を追加</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">追加者名 (ハンデ戦用)</label>
+                        <input type="text" id="addedBy"
+                            class="w-full p-2 rounded bg-gray-700 border border-gray-600 text-sm focus:outline-none focus:border-green-500"
+                            placeholder="あなたの名前">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">YouTube URL / Share Link</label>
+                        <div class="flex">
+                            <input type="text" id="ytUrl"
+                                class="flex-grow p-2 rounded bg-gray-700 border border-gray-600 text-sm focus:outline-none focus:border-green-500"
+                                placeholder="https://youtu.be/...">
+                            <button onclick="fetchMetadata()"
+                                class="ml-2 bg-blue-600 px-3 rounded text-sm font-bold">取得</button>
+                        </div>
+                    </div>
+
+                    <div id="previewArea" class="hidden bg-black p-2 rounded text-center">
+                        <img id="thumb" class="w-full h-32 object-cover rounded opacity-50 mb-2">
+                        <div class="text-xs text-gray-400" id="videoTitle"></div>
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">正解（メイン）</label>
+                        <input type="text" id="titleMain"
+                            class="w-full p-2 rounded bg-gray-700 border border-gray-600 font-bold" placeholder="曲名">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">正解（ひらがな/別名）</label>
+                        <input type="text" id="titleHira" class="w-full p-2 rounded bg-gray-700 border border-gray-600"
+                            placeholder="よみがな (任意)">
+                    </div>
+
+                    <button onclick="addSong()"
+                        class="w-full bg-green-600 hover:bg-green-700 py-3 rounded font-bold shadow-lg">
+                        リストに追加 ➕
+                    </button>
+                    <p class="text-xs text-center text-gray-500 mt-2">※選択中のプレイリストに追加されます</p>
+                </div>
+            </div>
+
+            <!-- Song List -->
+            <div class="w-full md:w-2/3 p-6 overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex flex-col">
+                        <h2 class="text-2xl font-bold text-white flex items-center">
+                            <span id="currentListName" class="text-yellow-400">Global</span>
+                            <span class="text-sm font-normal text-gray-400 ml-2">(<span id="songCount">0</span>曲)</span>
+                        </h2>
+                        <div class="flex space-x-2 mt-2">
+                            <button onclick="renameCurrentPlaylist()"
+                                class="text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded">✏️ 名前変更</button>
+                            <button onclick="copyCurrentPlaylist()"
+                                class="text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded">📋 複製</button>
+                            <button onclick="deleteCurrentPlaylist()"
+                                class="text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded">🗑️ 削除</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Box -->
+                <div class="mb-4">
+                    <input type="text" id="songSearch" placeholder="🔍 曲名で検索..."
+                        class="w-full p-2 rounded bg-gray-700 border border-gray-600 text-sm focus:outline-none focus:border-green-500"
+                        oninput="filterSongs()">
+                </div>
+
+                <div id="songsContainer" class="grid grid-cols-1 gap-3"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-800 p-6 rounded-xl w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-yellow-400">曲情報を編集</h3>
+            <input type="hidden" id="editSongId">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1">正解（メイン）</label>
+                    <input type="text" id="editTitleMain"
+                        class="w-full p-2 rounded bg-gray-700 border border-gray-600 font-bold">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1">正解（ひらがな/別名）</label>
+                    <input type="text" id="editTitleHira" class="w-full p-2 rounded bg-gray-700 border border-gray-600">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1">追加者名 (ハンデ戦用)</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="editAddedBy"
+                            class="flex-grow p-2 rounded bg-gray-700 border border-gray-600">
+                        <button onclick="linkToMe()"
+                            class="bg-pink-600 hover:bg-pink-700 px-3 rounded text-xs font-bold whitespace-nowrap">🔗
+                            自分に紐づけ</button>
+                    </div>
+                    <input type="hidden" id="editAddedByUUID">
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="saveEdit()"
+                        class="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded font-bold">保存</button>
+                    <button onclick="closeEditModal()"
+                        class="flex-1 bg-gray-600 hover:bg-gray-700 py-2 rounded font-bold">キャンセル</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPlaylistId = 'global';
+        let currentPlaylistName = 'Global (Default)';
+        let activeListenerRef = null;
+        let currentSongs = {}; // Store current songs for filtering
+
+        async function init() {
+            if (!window.VibeQuiz || !window.VibeQuiz.db) { setTimeout(init, 500); return; }
+
+            const db = window.VibeQuiz.db;
+
+            db.ref('playlists').on('value', snap => {
+                const el = document.getElementById('playlistList');
+                el.innerHTML = '';
+                const data = snap.val() || {};
+
+                Object.entries(data).forEach(([key, val]) => {
+                    const div = document.createElement('div');
+                    const isActive = key === currentPlaylistId;
+                    div.id = `pl-${key}`;
+                    div.className = `p-3 rounded cursor-pointer transition hover:bg-indigo-800 ${isActive ? 'bg-indigo-700 border-l-4 border-pink-500' : 'bg-indigo-900/50'}`;
+                    div.innerHTML = `<div class="font-bold text-sm">${val.name}</div>`;
+                    div.onclick = () => selectPlaylist(key, val.name);
+                    el.appendChild(div);
+                });
+
+                updateHighlights();
+            });
+
+            selectPlaylist('global', 'Global (Default)');
+        }
+
+        async function createPlaylist() {
+            if (!window.VibeQuiz) { alert("読込中..."); return; }
+            const name = prompt("新しいプレイリスト名:");
+            if (!name) return;
+
+            try {
+                await window.VibeQuiz.createPlaylist(name);
+            } catch (e) {
+                alert("作成エラー: " + e.message);
+            }
+        }
+
+        async function renameCurrentPlaylist() {
+            if (currentPlaylistId === 'global') { alert("Globalプレイリストは変更できません"); return; }
+            const newName = prompt("新しい名前:", currentPlaylistName);
+            if (!newName || newName === currentPlaylistName) return;
+
+            try {
+                await window.VibeQuiz.renamePlaylist(currentPlaylistId, newName);
+                currentPlaylistName = newName;
+                document.getElementById('currentListName').innerText = newName;
+            } catch (e) { alert("変更エラー: " + e.message); }
+        }
+
+        async function copyCurrentPlaylist() {
+            if (!confirm(`「${currentPlaylistName}」を複製しますか？`)) return;
+            try {
+                await window.VibeQuiz.duplicatePlaylist(currentPlaylistId);
+                alert("複製しました！");
+            } catch (e) { alert("複製エラー: " + e.message); }
+        }
+
+        async function deleteCurrentPlaylist() {
+            if (currentPlaylistId === 'global') {
+                alert("Globalプレイリストは削除できません");
+                return;
+            }
+            if (!confirm(`「${currentPlaylistName}」を削除しますか？\nこの操作は取り消せません。`)) return;
+            try {
+                await window.VibeQuiz.deletePlaylist(currentPlaylistId);
+                selectPlaylist('global', 'Global (Default)');
+                alert("削除しました");
+            } catch (e) { alert("削除エラー: " + e.message); }
+        }
+
+        function selectPlaylist(id, name) {
+            currentPlaylistId = id;
+            currentPlaylistName = name;
+            document.getElementById('currentListName').innerText = name;
+
+            const db = window.VibeQuiz.db;
+            const path = id === 'global' ? 'playlist' : `playlists/${id}/songs`;
+
+            if (activeListenerRef) activeListenerRef.off();
+
+            activeListenerRef = db.ref(path);
+            activeListenerRef.on('value', snap => {
+                renderSongs(snap.val() || {});
+            });
+
+            updateHighlights();
+        }
+
+        function updateHighlights() {
+            const gEl = document.getElementById('pl-global');
+            if (gEl) gEl.className = `p-3 rounded cursor-pointer transition hover:bg-indigo-800 ${currentPlaylistId === 'global' ? 'bg-indigo-700 border-l-4 border-yellow-400' : 'bg-indigo-700'}`;
+
+            const list = document.getElementById('playlistList');
+            Array.from(list.children).forEach(child => {
+                const key = child.id.replace('pl-', '');
+                child.className = `p-3 rounded cursor-pointer transition hover:bg-indigo-800 ${key === currentPlaylistId ? 'bg-indigo-700 border-l-4 border-pink-500' : 'bg-indigo-900/50'}`;
+            });
+        }
+
+        function filterSongs() {
+            const query = document.getElementById('songSearch').value;
+            renderSongs(currentSongs, query);
+        }
+
+        function renderSongs(songs, searchQuery = '') {
+            currentSongs = songs; // Store for filtering
+            const el = document.getElementById('songsContainer');
+            el.innerHTML = '';
+
+            // Filter by search query
+            const filteredEntries = Object.entries(songs).filter(([key, song]) => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return (song.titleMain && song.titleMain.toLowerCase().includes(q)) ||
+                    (song.titleHira && song.titleHira.toLowerCase().includes(q)) ||
+                    (song.addedBy && song.addedBy.toLowerCase().includes(q));
+            });
+
+            document.getElementById('songCount').innerText = Object.keys(songs).length;
+
+            if (!songs || Object.keys(songs).length === 0) {
+                el.innerHTML = '<div class="text-gray-500 p-4">曲がまだありません</div>';
+                return;
+            }
+            if (filteredEntries.length === 0) {
+                el.innerHTML = '<div class="text-gray-500 p-4">検索結果がありません</div>';
+                return;
+            }
+
+            filteredEntries.forEach(([key, song]) => {
+                const div = document.createElement('div');
+                div.className = "bg-gray-800 p-3 rounded flex items-center space-x-4 hover:bg-gray-700 transition group";
+                div.innerHTML = `
+                    <img src="${song.thumbnail}" class="w-16 h-9 object-cover rounded bg-black">
+                    <div class="flex-grow">
+                        <a href="https://www.youtube.com/watch?v=${song.youtubeId}" target="_blank" 
+                           class="font-bold text-white text-sm line-clamp-1 hover:text-pink-400 hover:underline cursor-pointer">
+                            ${song.titleMain}
+                        </a>
+                        <div class="text-xs text-gray-400 line-clamp-1">${song.titleHira || '-'}</div>
+                        ${song.addedBy ? `<div class="text-[10px] text-pink-400">by ${song.addedBy}</div>` : ''}
+                    </div>
+                `;
+
+                // ★★★ Edit Button ★★★
+                const editBtn = document.createElement('button');
+                editBtn.className = "bg-blue-600 text-white px-3 py-1 rounded text-xs opacity-50 group-hover:opacity-100 transition";
+                editBtn.innerText = "編集";
+                editBtn.onclick = () => openEditModal(key, song);
+                div.appendChild(editBtn);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = "bg-red-600 text-white px-3 py-1 rounded text-xs opacity-50 group-hover:opacity-100 transition";
+                delBtn.innerText = "削除";
+                delBtn.onclick = () => deleteSong(key);
+                div.appendChild(delBtn);
+
+                el.appendChild(div);
+            });
+        }
+
+        // ★★★ Edit Modal Functions ★★★
+        function openEditModal(songId, song) {
+            document.getElementById('editSongId').value = songId;
+            document.getElementById('editTitleMain').value = song.titleMain || '';
+            document.getElementById('editTitleHira').value = song.titleHira || '';
+            document.getElementById('editAddedBy').value = song.addedBy || '';
+            document.getElementById('editAddedByUUID').value = song.addedByUUID || '';
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        // ★★★ 自分に紐づけ機能 ★★★
+        function linkToMe() {
+            const nickname = localStorage.getItem('vibeQuizNickname') || '';
+            const uuid = window.VibeQuiz.getUserId ? window.VibeQuiz.getUserId() : null;
+
+            if (!nickname) {
+                alert("ロビー画面でニックネームを設定してから使用してください");
+                return;
+            }
+
+            document.getElementById('editAddedBy').value = nickname;
+            document.getElementById('editAddedByUUID').value = uuid || '';
+            alert(`「${nickname}」に紐づけました！\n保存ボタンを押して確定してください。`);
+        }
+
+        async function saveEdit() {
+            const songId = document.getElementById('editSongId').value;
+            const newMain = document.getElementById('editTitleMain').value.trim();
+            const newHira = document.getElementById('editTitleHira').value.trim();
+            const newAddedBy = document.getElementById('editAddedBy').value.trim();
+            const newAddedByUUID = document.getElementById('editAddedByUUID').value.trim();
+
+            if (!newMain) { alert("正解（メイン）を入力してください"); return; }
+
+            try {
+                await window.VibeQuiz.updateSong(currentPlaylistId, songId, {
+                    titleMain: newMain,
+                    titleHira: newHira,
+                    addedBy: newAddedBy || null,
+                    addedByUUID: newAddedByUUID || null
+                });
+                closeEditModal();
+            } catch (e) {
+                alert("更新エラー: " + e.message);
+            }
+        }
+
+        function extractVideoId(url) {
+            let videoId = "";
+            const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+            const match = url.match(regExp);
+            if (match && match[7].length == 11) videoId = match[7];
+            return videoId;
+        }
+
+        async function fetchMetadata() {
+            const url = document.getElementById('ytUrl').value;
+            const videoId = extractVideoId(url);
+
+            if (!videoId) { alert("有効なYouTube URLではありません"); return; }
+
+            const thumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+            document.getElementById('thumb').src = thumb;
+            document.getElementById('previewArea').classList.remove('hidden');
+            document.getElementById('ytUrl').dataset.videoId = videoId;
+        }
+
+        async function addSong() {
+            if (!window.VibeQuiz) { alert("Firebase読込中..."); return; }
+
+            let videoId = document.getElementById('ytUrl').dataset.videoId;
+
+            if (!videoId) {
+                const rawUrl = document.getElementById('ytUrl').value;
+                videoId = extractVideoId(rawUrl);
+            }
+
+            const main = document.getElementById('titleMain').value;
+            const hira = document.getElementById('titleHira').value;
+            const addedBy = document.getElementById('addedBy').value.trim();
+
+            if (!videoId || !main) { alert("URL(または動画ID)と正解を入力してください！"); return; }
+
+            // Check for duplicates
+            const existingSongs = Object.values(currentSongs);
+            const duplicate = existingSongs.find(s => s.youtubeId === videoId);
+            if (duplicate) {
+                alert(`⚠️ この曲は既にプレイリストに存在します！\n曲名: ${duplicate.titleMain}`);
+                return;
+            }
+
+            try {
+                // UUIDを取得（ハンデ戦用）
+                const addedByUUID = window.VibeQuiz.getUserId ? window.VibeQuiz.getUserId() : null;
+
+                await window.VibeQuiz.addSongToPlaylist(currentPlaylistId, {
+                    youtubeId: videoId,
+                    titleMain: main,
+                    titleHira: hira,
+                    thumbnail: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+                    addedBy: addedBy || null,
+                    addedByUUID: addedByUUID  // UUID も保存
+                });
+
+                document.getElementById('ytUrl').value = '';
+                document.getElementById('ytUrl').dataset.videoId = '';
+                document.getElementById('titleMain').value = '';
+                document.getElementById('titleHira').value = '';
+                // Keep addedBy for convenience when adding multiple songs
+                document.getElementById('previewArea').classList.add('hidden');
+            } catch (e) {
+                alert("追加エラー: " + e.message);
+            }
+        }
+
+        async function deleteSong(key) {
+            if (confirm("削除しますか？")) {
+                await window.VibeQuiz.deleteSong(currentPlaylistId, key);
+            }
+        }
+
+        init();
+
+    </script>
+</body>
+
+</html>
