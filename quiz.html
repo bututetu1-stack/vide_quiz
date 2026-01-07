@@ -654,7 +654,7 @@
                 currentSongId = data.currentSongId;
                 currentSongAddedBy = data.currentSongAddedBy || null;
                 wrongAnswers = data.wrongAnswers || {};
-                currentStartTime = data.startTime || 0;
+                currentStartTime = data.playStartTime || data.startTime || 0;
 
                 const qCount = data.questionCount || 0;
                 window.currentQuestionCount = qCount;
@@ -861,8 +861,9 @@
                         els.buzzer.innerText = "⏳";
                         els.buzzer.style.opacity = "0.7";
                         els.buzzer.onclick = () => {
-                            // 秒数を表示するが、回答権は得られない
-                            const buzzTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+                            // ★ 曲開始からの経過時間を計算 ★
+                            const serverNow = Date.now() + serverTimeOffset;
+                            const buzzTime = Math.max(0, (serverNow - currentStartTime) / 1000);
                             document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
                             document.getElementById('myBuzzTime').classList.remove('hidden');
                             // ボタンを押した後は無効化
@@ -1053,8 +1054,9 @@
             // ★ UUIDベースでwrongAnswersチェック（同名ユーザー対策）★
             const userId = localStorage.getItem('vibeQuizUserId') || '';
             if (!wrongAnswers[userId]) {
-                // ★ 押した秒数を記録・表示（先に表示してからFirebaseに送信）★
-                const buzzTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+                // ★ 曲開始からの経過時間を計算（サーバー時刻同期）★
+                const serverNow = Date.now() + serverTimeOffset;
+                const buzzTime = Math.max(0, (serverNow - currentStartTime) / 1000);
                 document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
                 document.getElementById('myBuzzTime').classList.remove('hidden');
 
