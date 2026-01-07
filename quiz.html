@@ -699,8 +699,8 @@
                 els.buzzerStatus.classList.add('hidden');
                 if (player && player.pauseVideo) player.pauseVideo();
 
-                // ★ 待機中は設定セクションを表示 ★
-                document.getElementById('settingsSection').classList.remove('hidden');
+                // ★ ゲーム中（result含む）は設定セクションを非表示 ★
+                document.getElementById('settingsSection').classList.add('hidden');
             }
             else if (status === 'playing') {
                 els.rank.classList.add('hidden');
@@ -727,7 +727,9 @@
                     }, 50);
                 });
 
-                if (wrongAnswers && wrongAnswers[currentUser]) {
+                // ★ UUIDベースでwrongAnswersチェック ★
+                const myUserId = localStorage.getItem('vibeQuizUserId') || '';
+                if (wrongAnswers && wrongAnswers[myUserId]) {
                     els.buzzer.disabled = true;
                     els.buzzer.style.opacity = "0.5";
                     els.buzzer.innerText = "❌";
@@ -1011,13 +1013,15 @@
         };
 
         window.buzz = () => {
-            if (!wrongAnswers[currentUser]) {
+            // ★ UUIDベースでwrongAnswersチェック（同名ユーザー対策）★
+            const userId = localStorage.getItem('vibeQuizUserId') || '';
+            if (!wrongAnswers[userId]) {
                 // ★ 押した秒数を記録・表示 ★
                 const buzzTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
                 document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
                 document.getElementById('myBuzzTime').classList.remove('hidden');
 
-                window.VibeQuiz.buzz(roomId, currentUser);
+                window.VibeQuiz.buzz(roomId, currentUser, userId);
             }
         };
         window.forceAudio = () => { if (player) { player.unMute(); player.setVolume(100); player.playVideo(); } };

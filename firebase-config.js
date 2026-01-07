@@ -354,11 +354,12 @@ window.VibeQuiz = {
         return nextId;
     },
 
-    buzz: async (roomId, username) => {
+    buzz: async (roomId, username, userId) => {
         const roomRef = db.ref(`rooms/${roomId}`);
         return roomRef.transaction((room) => {
             if (room && room.status === 'playing' && !room.buzzerUser) {
-                if (room.wrongAnswers && room.wrongAnswers[username]) return; // Lockout
+                // ★ UUIDベースでwrongAnswersチェック（同名ユーザー対策）★
+                if (room.wrongAnswers && room.wrongAnswers[userId]) return; // Lockout
                 room.status = 'buzzed';
                 room.buzzerUser = username;
                 return room;
@@ -498,7 +499,10 @@ window.VibeQuiz = {
 
     reportLoss: async (roomId, username, currentVideoTime) => {
         const roomRef = db.ref(`rooms/${roomId}`);
-        await roomRef.child(`wrongAnswers/${username}`).set(true);
+
+        // ★ UUIDベースでwrongAnswersを登録（同名ユーザー対策）★
+        const userUUID = getOrCreateUserId();
+        await roomRef.child(`wrongAnswers/${userUUID}`).set(true);
 
         // Get room settings for handicap mode penalty
         const roomSnap = await roomRef.once('value');
