@@ -590,8 +590,9 @@
                             <button onclick="kickUser('${uid}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs">✖</button>
                         `;
                     } else {
-                        // ★ 冠は部屋の作成者名と一致し、最初に見つかった人のみ表示 ★
-                        li.textContent = `${u.name} (${u.score || 0}pt)`;
+                        // ★ ホスト名と一致する人に冠を表示 ★
+                        const hostBadge = u.name === currentHostName ? ' 👑' : '';
+                        li.textContent = `${u.name}${hostBadge} (${u.score || 0}pt)`;
                     }
                     list.appendChild(li);
                 });
@@ -1031,12 +1032,15 @@
             // ★ UUIDベースでwrongAnswersチェック（同名ユーザー対策）★
             const userId = localStorage.getItem('vibeQuizUserId') || '';
             if (!wrongAnswers[userId]) {
-                // ★ 押した秒数を記録・表示 ★
+                // ★ 押した秒数を記録・表示（先に表示してからFirebaseに送信）★
                 const buzzTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
                 document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
                 document.getElementById('myBuzzTime').classList.remove('hidden');
 
-                window.VibeQuiz.buzz(roomId, currentUser, userId, buzzTime);
+                // ★ 既にbuzzed状態でも秒数は表示するが、Firebaseには送信しない ★
+                if (currentStatus === 'playing') {
+                    window.VibeQuiz.buzz(roomId, currentUser, userId, buzzTime);
+                }
             }
         };
         window.forceAudio = () => { if (player) { player.unMute(); player.setVolume(100); player.playVideo(); } };
