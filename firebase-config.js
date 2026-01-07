@@ -344,6 +344,8 @@ window.VibeQuiz = {
             seekTo: 0,
             questionCount: currentCount + 1,
             wrongAnswers: null,
+            buzzTimes: null,  // ★ buzzTimesをクリア ★
+            playStartTime: firebase.database.ServerValue.TIMESTAMP, // ★ 曲開始時刻 ★
             startTime: firebase.database.ServerValue.TIMESTAMP, // Server timestamp for sync
             message: {
                 text: `第${currentCount + 1}問！スタート！`,
@@ -354,16 +356,43 @@ window.VibeQuiz = {
         return nextId;
     },
 
-    buzz: async (roomId, username, userId) => {
+    buzz: async (roomId, username, userId, buzzTime) => {
         const roomRef = db.ref(`rooms/${roomId}`);
+
+        // ★ buzzTimeを記録（最速押下者判定用）★
+        await roomRef.child(`buzzTimes/${userId}`).set({
+            username: username,
+            time: buzzTime,
+            timestamp: Date.now()
+        });
+
+        // トランザクションで最速押下者を判定
         return roomRef.transaction((room) => {
-            if (room && room.status === 'playing' && !room.buzzerUser) {
-                // ★ UUIDベースでwrongAnswersチェック（同名ユーザー対策）★
-                if (room.wrongAnswers && room.wrongAnswers[userId]) return; // Lockout
-                room.status = 'buzzed';
-                room.buzzerUser = username;
+            if (room && room.status === 'playing') {
+                // wrongAnswersチェック
+                if (room.wrongAnswers && room.wrongAnswers[userId]) return room;
+
+                // buzzTimesから最速押下者を判定
+                const buzzTimes = room.buzzTimes || {};
+                let fastestUser = null;
+                let fastestTime = Infinity;
+
+                for (const [uid, data] of Object.entries(buzzTimes)) {
+                    // wrongAnswersに登録されているユーザーは除外
+                    if (room.wrongAnswers && room.wrongAnswers[uid]) continue;
+                    if (data.time < fastestTime) {
+                        fastestTime = data.time;
+                        fastestUser = data.username;
+                    }
+                }
+
+                if (fastestUser && !room.buzzerUser) {
+                    room.status = 'buzzed';
+                    room.buzzerUser = fastestUser;
+                }
                 return room;
             }
+            return room;
         });
     },
 

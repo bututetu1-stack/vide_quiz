@@ -94,9 +94,9 @@
                             class="w-full p-2 rounded bg-gray-700 border border-gray-600 font-bold" placeholder="曲名">
                     </div>
                     <div>
-                        <label class="block text-gray-400 text-xs mb-1">正解（ひらがな/別名）</label>
-                        <input type="text" id="titleHira" class="w-full p-2 rounded bg-gray-700 border border-gray-600"
-                            placeholder="よみがな (任意)">
+                        <label class="block text-gray-400 text-xs mb-1">正解（ひらがな/別名）- 改行で複数登録可</label>
+                        <textarea id="titleHira" class="w-full p-2 rounded bg-gray-700 border border-gray-600" rows="3"
+                            placeholder="よみがな (任意)&#10;別名1&#10;別名2"></textarea>
                     </div>
 
                     <button onclick="addSong()"
@@ -152,8 +152,9 @@
                         class="w-full p-2 rounded bg-gray-700 border border-gray-600 font-bold">
                 </div>
                 <div>
-                    <label class="block text-gray-400 text-xs mb-1">正解（ひらがな/別名）</label>
-                    <input type="text" id="editTitleHira" class="w-full p-2 rounded bg-gray-700 border border-gray-600">
+                    <label class="block text-gray-400 text-xs mb-1">正解（ひらがな/別名）- 改行で複数登録可</label>
+                    <textarea id="editTitleHira" class="w-full p-2 rounded bg-gray-700 border border-gray-600"
+                        rows="3"></textarea>
                 </div>
                 <div>
                     <label class="block text-gray-400 text-xs mb-1">追加者名 (ハンデ戦用)</label>

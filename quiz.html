@@ -716,13 +716,21 @@
                 document.getElementById('settingsSection').classList.add('hidden');
 
                 els.timerContainer.classList.remove('hidden');
+
+                // ★ シークバーをplayStartTimeベースで計算（誤答後もリセットしない）★
+                const playStartTime = data.playStartTime || Date.now();
+                const serverNow = Date.now() + serverTimeOffset;
+                const elapsed = (serverNow - playStartTime) / 1000;
+                const remaining = Math.max(0, currentPlayDuration - elapsed);
+                const percentage = (remaining / currentPlayDuration) * 100;
+
                 requestAnimationFrame(() => {
                     const timerBar = document.getElementById('timerBar');
                     timerBar.className = "h-full w-full bg-yellow-400";
                     timerBar.style.transition = 'none';
-                    timerBar.style.width = '100%';
+                    timerBar.style.width = percentage + '%';
                     setTimeout(() => {
-                        timerBar.style.transition = `width ${currentPlayDuration}s linear`;
+                        timerBar.style.transition = `width ${remaining}s linear`;
                         timerBar.style.width = '0%';
                     }, 50);
                 });
@@ -1000,9 +1008,13 @@
 
             const nVal = normalize(val);
             const mains = normalize(currentSongData.titleMain);
-            const hiras = normalize(currentSongData.titleHira || '');
 
-            if (nVal === mains || (hiras && nVal === hiras)) {
+            // ★ 複数別名対応：改行で分割して各別名と照合 ★
+            const titleHiraRaw = currentSongData.titleHira || '';
+            const aliases = titleHiraRaw.split(/[\n\r]+/).map(a => normalize(a)).filter(a => a);
+            const isCorrect = nVal === mains || aliases.some(alias => nVal === alias);
+
+            if (isCorrect) {
                 // 回答タイム（曲開始からの経過時間）を取得
                 const answerTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
                 await window.VibeQuiz.reportWin(roomId, currentUser, currentSongId, currentSongData, answerTime);
@@ -1021,7 +1033,7 @@
                 document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
                 document.getElementById('myBuzzTime').classList.remove('hidden');
 
-                window.VibeQuiz.buzz(roomId, currentUser, userId);
+                window.VibeQuiz.buzz(roomId, currentUser, userId, buzzTime);
             }
         };
         window.forceAudio = () => { if (player) { player.unMute(); player.setVolume(100); player.playVideo(); } };
