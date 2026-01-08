@@ -377,6 +377,11 @@ window.VibeQuiz = {
 
                 // buzzTimesから最速押下者を判定（曲開始からの経過時間ベース）
                 const buzzTimes = room.buzzTimes || {};
+                const settings = room.settings || {};
+                const handicapMode = settings.handicapMode || false;
+                const handicapDelay = settings.handicapDelay || 0;
+                const songAddedByUUID = room.currentSongAddedByUUID || null;
+
                 let fastestUser = null;
                 let fastestUserId = null;
                 let fastestTime = Infinity;
@@ -385,7 +390,13 @@ window.VibeQuiz = {
                     // wrongAnswersに登録されているユーザーは除外
                     if (room.wrongAnswers && room.wrongAnswers[uid]) continue;
                     // ★ localTime（曲開始からの経過時間）で判定 ★
-                    const buzzTime = data.localTime !== undefined ? data.localTime : (data.time || Infinity);
+                    let buzzTime = data.localTime !== undefined ? data.localTime : (data.time || Infinity);
+
+                    // ★ ハンデ遅延：追加者の場合は遅延を加算 ★
+                    if (handicapMode && handicapDelay > 0 && uid === songAddedByUUID) {
+                        buzzTime += handicapDelay;
+                    }
+
                     if (buzzTime < fastestTime) {
                         fastestTime = buzzTime;
                         fastestUser = data.username;

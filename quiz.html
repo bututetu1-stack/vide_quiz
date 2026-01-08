@@ -219,6 +219,23 @@
                                     </select>
                                 </div>
                             </div>
+                            <div class="mt-2">
+                                <label class="block text-gray-400 mb-1 text-[10px]">⏳ 追加者の回答権遅延</label>
+                                <select id="settingHandicapDelay" onchange="saveRoomSettings()"
+                                    class="w-full bg-indigo-950 border border-yellow-600 rounded p-1 text-white text-xs">
+                                    <option value="0">なし</option>
+                                    <option value="0.5">0.5秒</option>
+                                    <option value="1">1.0秒</option>
+                                    <option value="1.5">1.5秒</option>
+                                    <option value="2">2.0秒</option>
+                                    <option value="2.5">2.5秒</option>
+                                    <option value="3">3.0秒</option>
+                                    <option value="3.5">3.5秒</option>
+                                    <option value="4">4.0秒</option>
+                                    <option value="4.5">4.5秒</option>
+                                    <option value="5">5.0秒</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1049,24 +1066,29 @@
         window.buzz = () => {
             // ★ UUIDベースでwrongAnswersチェック（同名ユーザー対策）★
             const userId = localStorage.getItem('vibeQuizUserId') || '';
-            if (!wrongAnswers[userId] && myLastBuzzTime === null) {
-                // ★ 曲開始からの経過時間を計算（サーバー時刻同期）★
-                const serverNow = Date.now() + serverTimeOffset;
-                const buzzTime = Math.max(0, (serverNow - currentStartTime) / 1000);
-                myLastBuzzTime = buzzTime;  // ★ 一時保存 ★
 
-                // ★ UI確定（状態変更に依存しない）★
-                document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
-                document.getElementById('myBuzzTime').classList.remove('hidden');
-                const buzzerBtn = document.getElementById('buzzBtn');
+            // ★ 既に押していたら何もしない ★
+            if (myLastBuzzTime !== null) return;
+            if (wrongAnswers[userId]) return;
+
+            // ★ 曲開始からの経過時間を計算（サーバー時刻同期）★
+            const serverNow = Date.now() + serverTimeOffset;
+            const buzzTime = Math.max(0, (serverNow - currentStartTime) / 1000);
+            myLastBuzzTime = buzzTime;  // ★ 一時保存 ★
+
+            // ★ UI確定（状態変更に依存しない）★
+            document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
+            document.getElementById('myBuzzTime').classList.remove('hidden');
+            const buzzerBtn = document.getElementById('buzzBtn');
+            if (buzzerBtn) {
                 buzzerBtn.disabled = true;
                 buzzerBtn.innerText = "✓";
                 buzzerBtn.style.opacity = "0.5";
+            }
 
-                // ★ Firebaseに送信（playingの場合のみ）★
-                if (currentStatus === 'playing') {
-                    window.VibeQuiz.buzz(roomId, currentUser, userId, buzzTime);
-                }
+            // ★ Firebaseに送信（playingの場合のみ）★
+            if (currentStatus === 'playing') {
+                window.VibeQuiz.buzz(roomId, currentUser, userId, buzzTime);
             }
         };
         window.forceAudio = () => { if (player) { player.unMute(); player.setVolume(100); player.playVideo(); } };
@@ -1168,6 +1190,7 @@
             // ハンデ戦詳細設定
             document.getElementById('settingHandicapBonus').value = settings.handicapBonus !== undefined ? settings.handicapBonus : 2;
             document.getElementById('settingHandicapPenalty').value = settings.handicapPenalty !== undefined ? settings.handicapPenalty : -1;
+            document.getElementById('settingHandicapDelay').value = settings.handicapDelay !== undefined ? settings.handicapDelay : 0;
             toggleHandicapSettings();
 
             // プレイリストチェックボックスの状態を更新
@@ -1240,6 +1263,7 @@
                 handicapMode: document.getElementById('settingHandicapMode').checked,
                 handicapBonus: parseInt(document.getElementById('settingHandicapBonus').value),
                 handicapPenalty: parseInt(document.getElementById('settingHandicapPenalty').value),
+                handicapDelay: parseFloat(document.getElementById('settingHandicapDelay').value),
                 playlistIds: playlistIds
             };
 
