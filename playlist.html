@@ -116,12 +116,15 @@
                 <div class="flex justify-between items-center mb-4">
                     <div class="flex flex-col">
                         <h2 class="text-2xl font-bold text-white flex items-center">
+                            <span id="currentListPrivateIcon" class="hidden mr-1">🔒</span>
                             <span id="currentListName" class="text-yellow-400">Global</span>
                             <span class="text-sm font-normal text-gray-400 ml-2">(<span id="songCount">0</span>曲)</span>
                         </h2>
                         <div class="flex space-x-2 mt-2">
                             <button onclick="renameCurrentPlaylist()"
                                 class="text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded">✏️ 名前変更</button>
+                            <button onclick="togglePrivacy()" id="togglePrivacyBtn"
+                                class="text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded">🔓 公開</button>
                             <button onclick="copyCurrentPlaylist()"
                                 class="text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded">📋 複製</button>
                             <button onclick="deleteCurrentPlaylist()"
@@ -279,7 +282,9 @@
             } catch (e) { alert("削除エラー: " + e.message); }
         }
 
-        function selectPlaylist(id, name) {
+        let currentPlaylistIsPrivate = false;  // ★ 追加 ★
+
+        async function selectPlaylist(id, name) {
             currentPlaylistId = id;
             currentPlaylistName = name;
             document.getElementById('currentListName').innerText = name;
@@ -294,7 +299,54 @@
                 renderSongs(snap.val() || {});
             });
 
+            // ★ プレイリスト情報取得してisPrivate表示更新 ★
+            if (id === 'global') {
+                currentPlaylistIsPrivate = false;
+                updatePrivacyUI(false);
+            } else {
+                try {
+                    const info = await window.VibeQuiz.getPlaylistInfo(id);
+                    currentPlaylistIsPrivate = info ? info.isPrivate : false;
+                    updatePrivacyUI(currentPlaylistIsPrivate);
+                } catch (e) {
+                    updatePrivacyUI(false);
+                }
+            }
+
             updateHighlights();
+        }
+
+        function updatePrivacyUI(isPrivate) {
+            const icon = document.getElementById('currentListPrivateIcon');
+            const btn = document.getElementById('togglePrivacyBtn');
+            if (isPrivate) {
+                icon.classList.remove('hidden');
+                btn.innerHTML = '🔒 個人用';
+                btn.className = 'text-xs bg-yellow-700 hover:bg-yellow-600 px-2 py-1 rounded';
+            } else {
+                icon.classList.add('hidden');
+                btn.innerHTML = '🔓 公開';
+                btn.className = 'text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded';
+            }
+            // Globalの場合はボタンを非表示
+            if (currentPlaylistId === 'global') {
+                btn.classList.add('hidden');
+            } else {
+                btn.classList.remove('hidden');
+            }
+        }
+
+        async function togglePrivacy() {
+            if (currentPlaylistId === 'global') return;
+            const newPrivacy = !currentPlaylistIsPrivate;
+            try {
+                await window.VibeQuiz.togglePlaylistPrivacy(currentPlaylistId, newPrivacy);
+                currentPlaylistIsPrivate = newPrivacy;
+                updatePrivacyUI(newPrivacy);
+                alert(newPrivacy ? '個人用に変更しました（自分だけが見えます）' : '公開に変更しました（全員が見えます）');
+            } catch (e) {
+                alert('変更エラー: ' + e.message);
+            }
         }
 
         function updateHighlights() {

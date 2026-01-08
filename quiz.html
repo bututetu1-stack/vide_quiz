@@ -763,9 +763,14 @@
                 els.timerContainer.classList.remove('hidden');
 
                 // ★ シークバーをplayStartTimeベースで計算（誤答後もリセットしない）★
-                const playStartTime = data.playStartTime || Date.now();
                 const serverNow = Date.now() + serverTimeOffset;
-                const elapsed = (serverNow - playStartTime) / 1000;
+                let playStartTime = data.playStartTime || serverNow;
+
+                // ★ playStartTimeが未来または古すぎる場合は現在時刻を使用 ★
+                if (playStartTime > serverNow + 1000) {
+                    playStartTime = serverNow;
+                }
+                const elapsed = Math.max(0, (serverNow - playStartTime) / 1000);
                 const remaining = Math.max(0, currentPlayDuration - elapsed);
                 const percentage = (remaining / currentPlayDuration) * 100;
 

@@ -778,6 +778,30 @@ window.VibeQuiz = {
         await db.ref(`playlists/${playlistId}`).update({ name: newName });
     },
 
+    // ★ プレイリスト情報取得 ★
+    getPlaylistInfo: async (playlistId) => {
+        if (playlistId === 'global') return { id: 'global', name: 'Global (Default)', isPrivate: false };
+        const snap = await db.ref(`playlists/${playlistId}`).once('value');
+        const data = snap.val();
+        if (!data) return null;
+        return {
+            id: playlistId,
+            name: data.name,
+            isPrivate: data.isPrivate || false,
+            ownerUUID: data.ownerUUID || null
+        };
+    },
+
+    // ★ 個人用/公開切り替え ★
+    togglePlaylistPrivacy: async (playlistId, isPrivate) => {
+        if (playlistId === 'global') throw new Error("Globalプレイリストは変更できません");
+        const userId = getOrCreateUserId();
+        await db.ref(`playlists/${playlistId}`).update({
+            isPrivate: isPrivate,
+            ownerUUID: isPrivate ? userId : null
+        });
+    },
+
     deletePlaylist: async (playlistId) => {
         if (playlistId === 'global') throw new Error("Globalプレイリストは削除できません");
         await db.ref(`playlists/${playlistId}`).remove();
