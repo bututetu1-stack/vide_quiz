@@ -734,9 +734,11 @@
                 // ★ ゲーム中（result含む）は設定セクションを非表示 ★
                 document.getElementById('settingsSection').classList.add('hidden');
 
-                // ★ ホストにスキップボタンを表示 ★
+                // ★ ソロモード（ユーザー1人）かつホストの場合のみスキップボタンを表示 ★
                 const skipBtn = document.getElementById('skipWaitBtn');
-                if (skipBtn && isHost()) {
+                const userCount = data.users ? Object.keys(data.users).length : 0;
+                const isSoloMode = userCount <= 1;
+                if (skipBtn && isHost() && isSoloMode) {
                     skipBtn.classList.remove('hidden');
                 } else if (skipBtn) {
                     skipBtn.classList.add('hidden');

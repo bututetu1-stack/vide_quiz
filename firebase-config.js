@@ -823,6 +823,17 @@ window.VibeQuiz = {
 
     renamePlaylist: async (playlistId, newName) => {
         if (playlistId === 'global') throw new Error("Globalプレイリストの名前は変更できません");
+
+        // ★ 編集権限チェック ★
+        const plSnap = await db.ref(`playlists/${playlistId}`).once('value');
+        const plData = plSnap.val();
+        if (plData && plData.editable === false) {
+            const userId = getOrCreateUserId();
+            if (plData.creatorUUID !== userId) {
+                throw new Error("このプレイリストは編集不可です");
+            }
+        }
+
         await db.ref(`playlists/${playlistId}`).update({ name: newName });
     },
 
@@ -876,6 +887,17 @@ window.VibeQuiz = {
 
     deletePlaylist: async (playlistId) => {
         if (playlistId === 'global') throw new Error("Globalプレイリストは削除できません");
+
+        // ★ 編集権限チェック ★
+        const plSnap = await db.ref(`playlists/${playlistId}`).once('value');
+        const plData = plSnap.val();
+        if (plData && plData.editable === false) {
+            const userId = getOrCreateUserId();
+            if (plData.creatorUUID !== userId) {
+                throw new Error("このプレイリストは編集不可です");
+            }
+        }
+
         await db.ref(`playlists/${playlistId}`).remove();
     },
 
