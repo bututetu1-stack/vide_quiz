@@ -35,6 +35,8 @@ function getOrCreateUserId() {
 }
 
 // Global VibeQuiz Object
+let nextQuestionTimer = null;  // ★ 次の問題へのタイマー ★
+
 window.VibeQuiz = {
     db: db,
     getUserId: getOrCreateUserId,
@@ -225,6 +227,12 @@ window.VibeQuiz = {
 
     // Game Logic
     nextQuestion: async (roomId) => {
+        // ★ 既存のタイマーをクリア（スキップ時の二重進行を防ぐ）★
+        if (nextQuestionTimer) {
+            clearTimeout(nextQuestionTimer);
+            nextQuestionTimer = null;
+        }
+
         const roomRef = db.ref(`rooms/${roomId}`);
 
         // Playlist Logic
@@ -545,7 +553,8 @@ window.VibeQuiz = {
             console.error('Stats save error:', e);
         }
 
-        setTimeout(() => window.VibeQuiz.nextQuestion(roomId), 6000);
+        // ★ タイマーIDを保存（スキップ時にキャンセル可能に）★
+        nextQuestionTimer = setTimeout(() => window.VibeQuiz.nextQuestion(roomId), 6000);
     },
 
     reportLoss: async (roomId, username, currentVideoTime) => {
@@ -674,7 +683,8 @@ window.VibeQuiz = {
             console.error('Stats save error:', e);
         }
 
-        setTimeout(() => window.VibeQuiz.nextQuestion(roomId), 7000);
+        // ★ タイマーIDを保存（スキップ時にキャンセル可能に）★
+        nextQuestionTimer = setTimeout(() => window.VibeQuiz.nextQuestion(roomId), 7000);
     },
 
     stopGame: async (roomId) => {
