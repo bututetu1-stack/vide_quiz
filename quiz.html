@@ -834,7 +834,13 @@
                 const myUserId = localStorage.getItem('vibeQuizUserId') || '';
                 const currentBuzzerUserId = data.buzzerUserId || '';  // ★ 現在のbuzzerUserIdを取得 ★
 
-                console.log('Buzz check:', { myUserId, currentBuzzerUserId, name });
+                console.log('Buzz check:', {
+                    myUserId,
+                    currentBuzzerUserId,
+                    name,
+                    match: currentBuzzerUserId === myUserId,
+                    dataKeys: Object.keys(data)
+                });
 
                 if (currentBuzzerUserId && currentBuzzerUserId === myUserId) {
                     els.ansArea.classList.remove('hidden');
