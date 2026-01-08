@@ -1058,9 +1058,10 @@
                 // ★ UI確定（状態変更に依存しない）★
                 document.getElementById('myBuzzTimeValue').textContent = buzzTime.toFixed(2) + '秒';
                 document.getElementById('myBuzzTime').classList.remove('hidden');
-                els.buzzer.disabled = true;
-                els.buzzer.innerText = "✓";
-                els.buzzer.style.opacity = "0.5";
+                const buzzerBtn = document.getElementById('buzzer');
+                buzzerBtn.disabled = true;
+                buzzerBtn.innerText = "✓";
+                buzzerBtn.style.opacity = "0.5";
 
                 // ★ Firebaseに送信（playingの場合のみ）★
                 if (currentStatus === 'playing') {
