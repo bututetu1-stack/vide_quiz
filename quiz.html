@@ -710,6 +710,12 @@
                 els.timerContainer.classList.add('hidden');
                 els.buzzerStatus.classList.add('hidden');
                 if (player && player.pauseVideo) player.pauseVideo();
+
+                // ★ waiting状態では設定パネルを表示 ★
+                const settingsSection = document.getElementById('settingsSection');
+                if (settingsSection && isHost()) {
+                    settingsSection.classList.remove('hidden');
+                }
             }
             else if (status === 'result') {
                 els.rank.classList.add('hidden');
@@ -729,9 +735,12 @@
                 els.buzzerStatus.classList.add('hidden');
                 els.buzzer.classList.remove('hidden');
 
-                // ★ 秒数表示をリセット ★
-                document.getElementById('myBuzzTime').classList.add('hidden');
-                myLastBuzzTime = null;  // ★ 一時保存もリセット ★
+                // ★ 秒数表示のリセットは曲が変わった時のみ ★
+                // （誤答後のplaying復帰時はリセットしない）
+                if (!data.buzzTimes) {
+                    document.getElementById('myBuzzTime').classList.add('hidden');
+                    myLastBuzzTime = null;
+                }
 
                 // ★ ゲーム中は設定セクションを非表示 ★
                 document.getElementById('settingsSection').classList.add('hidden');
