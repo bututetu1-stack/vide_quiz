@@ -731,14 +731,16 @@ window.VibeQuiz = {
 
     // --- Playlist V3 Logic ---
 
-    createPlaylist: async (name, isPrivate = false) => {
+    createPlaylist: async (name, isPrivate = false, editable = true) => {
         const ref = db.ref('playlists').push();
         const userId = getOrCreateUserId();
         await ref.set({
             name: name,
             createdAt: Date.now(),
-            isPrivate: isPrivate,  // ★ 個人用フラグ ★
-            ownerUUID: isPrivate ? userId : null  // ★ 個人用の場合はオーナーUUID ★
+            creatorUUID: userId,      // ★ 作成者UUID（常に記録）★
+            isPrivate: isPrivate,     // ★ 個人用フラグ ★
+            ownerUUID: isPrivate ? userId : null,  // ★ 個人用の場合のオーナー ★
+            editable: editable        // ★ 他の人が編集できるか ★
         });
         return ref.key;
     },
@@ -780,7 +782,7 @@ window.VibeQuiz = {
 
     // ★ プレイリスト情報取得 ★
     getPlaylistInfo: async (playlistId) => {
-        if (playlistId === 'global') return { id: 'global', name: 'Global (Default)', isPrivate: false };
+        if (playlistId === 'global') return { id: 'global', name: 'Global (Default)', isPrivate: false, editable: true, creatorUUID: null };
         const snap = await db.ref(`playlists/${playlistId}`).once('value');
         const data = snap.val();
         if (!data) return null;
@@ -788,18 +790,42 @@ window.VibeQuiz = {
             id: playlistId,
             name: data.name,
             isPrivate: data.isPrivate || false,
-            ownerUUID: data.ownerUUID || null
+            ownerUUID: data.ownerUUID || null,
+            creatorUUID: data.creatorUUID || null,
+            editable: data.editable !== false  // デフォルトはtrue
         };
     },
 
-    // ★ 個人用/公開切り替え ★
+    // ★ 個人用/公開切り替え（作成者のみ）★
     togglePlaylistPrivacy: async (playlistId, isPrivate) => {
         if (playlistId === 'global') throw new Error("Globalプレイリストは変更できません");
+
+        // ★ 作成者チェック ★
+        const snap = await db.ref(`playlists/${playlistId}`).once('value');
+        const data = snap.val();
         const userId = getOrCreateUserId();
+        if (data && data.creatorUUID && data.creatorUUID !== userId) {
+            throw new Error("作成者のみが個人用/公開を変更できます");
+        }
+
         await db.ref(`playlists/${playlistId}`).update({
             isPrivate: isPrivate,
             ownerUUID: isPrivate ? userId : null
         });
+    },
+
+    // ★ 編集可能設定の切り替え（作成者のみ）★
+    togglePlaylistEditable: async (playlistId, editable) => {
+        if (playlistId === 'global') throw new Error("Globalプレイリストは変更できません");
+
+        const snap = await db.ref(`playlists/${playlistId}`).once('value');
+        const data = snap.val();
+        const userId = getOrCreateUserId();
+        if (data && data.creatorUUID && data.creatorUUID !== userId) {
+            throw new Error("作成者のみが編集可能設定を変更できます");
+        }
+
+        await db.ref(`playlists/${playlistId}`).update({ editable: editable });
     },
 
     deletePlaylist: async (playlistId) => {

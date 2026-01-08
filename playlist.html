@@ -120,11 +120,13 @@
                             <span id="currentListName" class="text-yellow-400">Global</span>
                             <span class="text-sm font-normal text-gray-400 ml-2">(<span id="songCount">0</span>曲)</span>
                         </h2>
-                        <div class="flex space-x-2 mt-2">
+                        <div class="flex space-x-2 mt-2 flex-wrap gap-1">
                             <button onclick="renameCurrentPlaylist()"
                                 class="text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded">✏️ 名前変更</button>
                             <button onclick="togglePrivacy()" id="togglePrivacyBtn"
                                 class="text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded">🔓 公開</button>
+                            <button onclick="toggleEditable()" id="toggleEditableBtn"
+                                class="text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded">✅ 編集可</button>
                             <button onclick="copyCurrentPlaylist()"
                                 class="text-xs bg-indigo-700 hover:bg-indigo-600 px-2 py-1 rounded">📋 複製</button>
                             <button onclick="deleteCurrentPlaylist()"
@@ -299,17 +301,25 @@
                 renderSongs(snap.val() || {});
             });
 
-            // ★ プレイリスト情報取得してisPrivate表示更新 ★
+            // ★ プレイリスト情報取得してisPrivate/editable表示更新 ★
+            const myUserId = localStorage.getItem('vibeQuizUserId') || '';
             if (id === 'global') {
                 currentPlaylistIsPrivate = false;
+                currentPlaylistIsEditable = true;
+                currentPlaylistIsCreator = false;
                 updatePrivacyUI(false);
+                updateEditableUI(true, false);
             } else {
                 try {
                     const info = await window.VibeQuiz.getPlaylistInfo(id);
                     currentPlaylistIsPrivate = info ? info.isPrivate : false;
+                    currentPlaylistIsEditable = info ? info.editable : true;
+                    currentPlaylistIsCreator = info && info.creatorUUID === myUserId;
                     updatePrivacyUI(currentPlaylistIsPrivate);
+                    updateEditableUI(currentPlaylistIsEditable, currentPlaylistIsCreator);
                 } catch (e) {
                     updatePrivacyUI(false);
+                    updateEditableUI(true, false);
                 }
             }
 
@@ -336,6 +346,23 @@
             }
         }
 
+        function updateEditableUI(editable, isCreator) {
+            const btn = document.getElementById('toggleEditableBtn');
+            if (editable) {
+                btn.innerHTML = '✅ 編集可';
+                btn.className = 'text-xs bg-green-700 hover:bg-green-600 px-2 py-1 rounded';
+            } else {
+                btn.innerHTML = '🚫 編集不可';
+                btn.className = 'text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded';
+            }
+            // Globalの場合または作成者でない場合はボタンを非表示
+            if (currentPlaylistId === 'global' || !isCreator) {
+                btn.classList.add('hidden');
+            } else {
+                btn.classList.remove('hidden');
+            }
+        }
+
         async function togglePrivacy() {
             if (currentPlaylistId === 'global') return;
             const newPrivacy = !currentPlaylistIsPrivate;
@@ -344,6 +371,26 @@
                 currentPlaylistIsPrivate = newPrivacy;
                 updatePrivacyUI(newPrivacy);
                 alert(newPrivacy ? '個人用に変更しました（自分だけが見えます）' : '公開に変更しました（全員が見えます）');
+            } catch (e) {
+                alert('変更エラー: ' + e.message);
+            }
+        }
+
+        let currentPlaylistIsEditable = true;
+        let currentPlaylistIsCreator = false;
+
+        async function toggleEditable() {
+            if (currentPlaylistId === 'global') return;
+            if (!currentPlaylistIsCreator) {
+                alert('作成者のみが編集可能設定を変更できます');
+                return;
+            }
+            const newEditable = !currentPlaylistIsEditable;
+            try {
+                await window.VibeQuiz.togglePlaylistEditable(currentPlaylistId, newEditable);
+                currentPlaylistIsEditable = newEditable;
+                updateEditableUI(newEditable, true);
+                alert(newEditable ? '他の人も編集できるようになりました' : '他の人は編集できなくなりました');
             } catch (e) {
                 alert('変更エラー: ' + e.message);
             }
