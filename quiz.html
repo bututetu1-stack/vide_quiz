@@ -741,10 +741,25 @@
                 } else if (skipBtn) {
                     skipBtn.classList.add('hidden');
                 }
+
+                // ★ ホストのみが自動進行タイマーを設定 ★
+                if (isHost() && !window.resultAutoTimer) {
+                    window.resultAutoTimer = setTimeout(async () => {
+                        window.resultAutoTimer = null;
+                        try {
+                            await window.VibeQuiz.nextQuestion(roomId);
+                        } catch (e) {
+                            console.error('Auto next question error:', e);
+                        }
+                    }, 6000);
+                }
             }
             else if (status === 'playing') {
                 els.rank.classList.add('hidden');
                 if (buzzTimeout) { clearTimeout(buzzTimeout); buzzTimeout = null; }
+
+                // ★ result状態のタイマーをクリア ★
+                if (window.resultAutoTimer) { clearTimeout(window.resultAutoTimer); window.resultAutoTimer = null; }
 
                 els.buzzerStatus.classList.add('hidden');
                 els.buzzer.classList.remove('hidden');
@@ -1125,6 +1140,8 @@
         // ★ スキップボタン（result状態の待機時間をスキップ）★
         window.skipWait = async () => {
             if (!isHost()) return;
+            // ★ タイマーをクリア ★
+            if (window.resultAutoTimer) { clearTimeout(window.resultAutoTimer); window.resultAutoTimer = null; }
             try {
                 await window.VibeQuiz.nextQuestion(roomId);
             } catch (e) {

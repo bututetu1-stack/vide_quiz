@@ -552,9 +552,8 @@ window.VibeQuiz = {
         } catch (e) {
             console.error('Stats save error:', e);
         }
-
-        // ★ タイマーIDを保存（スキップ時にキャンセル可能に）★
-        nextQuestionTimer = setTimeout(() => window.VibeQuiz.nextQuestion(roomId), 6000);
+        // ★ タイマーはquiz.html側でホストのみが実行する ★
+        // （ここでは何もしない - 複数端末でのタイマー重複を防ぐ）
     },
 
     reportLoss: async (roomId, username, currentVideoTime) => {
@@ -682,9 +681,8 @@ window.VibeQuiz = {
         } catch (e) {
             console.error('Stats save error:', e);
         }
-
-        // ★ タイマーIDを保存（スキップ時にキャンセル可能に）★
-        nextQuestionTimer = setTimeout(() => window.VibeQuiz.nextQuestion(roomId), 7000);
+        // ★ タイマーはquiz.html側でホストのみが実行する ★
+        // （ここでは何もしない - 複数端末でのタイマー重複を防ぐ）
     },
 
     stopGame: async (roomId) => {
@@ -757,8 +755,20 @@ window.VibeQuiz = {
 
     addSongToPlaylist: async (playlistId, songData) => {
         const targetId = playlistId || 'global';
-        const path = targetId === 'global' ? 'playlist' : `playlists/${targetId}/songs`;
 
+        // ★ 編集権限チェック ★
+        if (targetId !== 'global') {
+            const plSnap = await db.ref(`playlists/${targetId}`).once('value');
+            const plData = plSnap.val();
+            if (plData && plData.editable === false) {
+                const userId = getOrCreateUserId();
+                if (plData.creatorUUID !== userId) {
+                    throw new Error("このプレイリストは編集不可です");
+                }
+            }
+        }
+
+        const path = targetId === 'global' ? 'playlist' : `playlists/${targetId}/songs`;
         const newSongRef = db.ref(path).push();
         await newSongRef.set({
             ...songData,
@@ -769,12 +779,38 @@ window.VibeQuiz = {
 
     updateSong: async (playlistId, songId, data) => {
         const targetId = playlistId || 'global';
+
+        // ★ 編集権限チェック ★
+        if (targetId !== 'global') {
+            const plSnap = await db.ref(`playlists/${targetId}`).once('value');
+            const plData = plSnap.val();
+            if (plData && plData.editable === false) {
+                const userId = getOrCreateUserId();
+                if (plData.creatorUUID !== userId) {
+                    throw new Error("このプレイリストは編集不可です");
+                }
+            }
+        }
+
         const path = targetId === 'global' ? `playlist/${songId}` : `playlists/${targetId}/songs/${songId}`;
         await db.ref(path).update(data);
     },
 
     deleteSong: async (playlistId, songId) => {
         const targetId = playlistId || 'global';
+
+        // ★ 編集権限チェック ★
+        if (targetId !== 'global') {
+            const plSnap = await db.ref(`playlists/${targetId}`).once('value');
+            const plData = plSnap.val();
+            if (plData && plData.editable === false) {
+                const userId = getOrCreateUserId();
+                if (plData.creatorUUID !== userId) {
+                    throw new Error("このプレイリストは編集不可です");
+                }
+            }
+        }
+
         const path = targetId === 'global' ? `playlist/${songId}` : `playlists/${targetId}/songs/${songId}`;
         await db.ref(path).remove();
     },
