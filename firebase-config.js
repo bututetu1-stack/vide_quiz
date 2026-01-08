@@ -122,7 +122,9 @@ window.VibeQuiz = {
         const data = snap.val() || {};
         return Object.entries(data).map(([id, val]) => ({
             id: id,
-            name: val.name
+            name: val.name,
+            isPrivate: val.isPrivate || false,
+            ownerUUID: val.ownerUUID || null
         }));
     },
 
@@ -729,11 +731,14 @@ window.VibeQuiz = {
 
     // --- Playlist V3 Logic ---
 
-    createPlaylist: async (name) => {
+    createPlaylist: async (name, isPrivate = false) => {
         const ref = db.ref('playlists').push();
+        const userId = getOrCreateUserId();
         await ref.set({
             name: name,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            isPrivate: isPrivate,  // ★ 個人用フラグ ★
+            ownerUUID: isPrivate ? userId : null  // ★ 個人用の場合はオーナーUUID ★
         });
         return ref.key;
     },

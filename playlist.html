@@ -43,10 +43,14 @@
 
         <!-- Sidebar: Playlist Selector -->
         <div class="w-64 bg-indigo-950 flex flex-col border-r border-indigo-800">
-            <div class="p-4 border-b border-indigo-800">
+            <div class="p-4 border-b border-indigo-800 space-y-2">
                 <button onclick="createPlaylist()"
                     class="w-full bg-pink-600 hover:bg-pink-700 text-white py-2 rounded font-bold shadow text-sm">
                     ＋ 新規プレイリスト
+                </button>
+                <button onclick="createPrivatePlaylist()"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded font-bold shadow text-sm">
+                    🔒 個人用プレイリスト
                 </button>
             </div>
             <div class="flex-grow overflow-y-auto p-2 space-y-2">
@@ -192,13 +196,21 @@
                 const el = document.getElementById('playlistList');
                 el.innerHTML = '';
                 const data = snap.val() || {};
+                const myUserId = localStorage.getItem('vibeQuizUserId') || '';
 
                 Object.entries(data).forEach(([key, val]) => {
+                    // ★ 個人用プレイリストは自分のものだけ表示 ★
+                    if (val.isPrivate && val.ownerUUID !== myUserId) return;
+
                     const div = document.createElement('div');
                     const isActive = key === currentPlaylistId;
+                    const isPrivate = val.isPrivate;
                     div.id = `pl-${key}`;
                     div.className = `p-3 rounded cursor-pointer transition hover:bg-indigo-800 ${isActive ? 'bg-indigo-700 border-l-4 border-pink-500' : 'bg-indigo-900/50'}`;
-                    div.innerHTML = `<div class="font-bold text-sm">${val.name}</div>`;
+                    div.innerHTML = `
+                        <div class="font-bold text-sm">${isPrivate ? '🔒 ' : ''}${val.name}</div>
+                        ${isPrivate ? '<div class="text-[10px] text-gray-400">個人用</div>' : ''}
+                    `;
                     div.onclick = () => selectPlaylist(key, val.name);
                     el.appendChild(div);
                 });
@@ -215,7 +227,20 @@
             if (!name) return;
 
             try {
-                await window.VibeQuiz.createPlaylist(name);
+                await window.VibeQuiz.createPlaylist(name, false);
+            } catch (e) {
+                alert("作成エラー: " + e.message);
+            }
+        }
+
+        async function createPrivatePlaylist() {
+            if (!window.VibeQuiz) { alert("読込中..."); return; }
+            const name = prompt("個人用プレイリスト名:");
+            if (!name) return;
+
+            try {
+                await window.VibeQuiz.createPlaylist(name, true);
+                alert("個人用プレイリストを作成しました。\nこのプレイリストはあなたがホストの時のみ使用できます。");
             } catch (e) {
                 alert("作成エラー: " + e.message);
             }

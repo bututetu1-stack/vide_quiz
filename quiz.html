@@ -291,6 +291,12 @@
                     <div class="text-sm text-gray-400">あなたの押した時間</div>
                     <div id="myBuzzTimeValue" class="text-2xl font-bold text-yellow-400">0.00秒</div>
                 </div>
+
+                <!-- スキップボタン（ソロモードのresult状態で表示） -->
+                <button id="skipWaitBtn" onclick="skipWait()"
+                    class="hidden mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg touch-manipulation">
+                    ⏭ 次へスキップ
+                </button>
             </div>
 
             <div id="rankingOverlay"
@@ -727,6 +733,14 @@
 
                 // ★ ゲーム中（result含む）は設定セクションを非表示 ★
                 document.getElementById('settingsSection').classList.add('hidden');
+
+                // ★ ホストにスキップボタンを表示 ★
+                const skipBtn = document.getElementById('skipWaitBtn');
+                if (skipBtn && isHost()) {
+                    skipBtn.classList.remove('hidden');
+                } else if (skipBtn) {
+                    skipBtn.classList.add('hidden');
+                }
             }
             else if (status === 'playing') {
                 els.rank.classList.add('hidden');
@@ -742,8 +756,9 @@
                     myLastBuzzTime = null;
                 }
 
-                // ★ ゲーム中は設定セクションを非表示 ★
+                // ★ ゲーム中は設定セクションとスキップボタンを非表示 ★
                 document.getElementById('settingsSection').classList.add('hidden');
+                document.getElementById('skipWaitBtn').classList.add('hidden');
 
                 els.timerContainer.classList.remove('hidden');
 
@@ -1102,6 +1117,16 @@
         };
         window.forceAudio = () => { if (player) { player.unMute(); player.setVolume(100); player.playVideo(); } };
 
+        // ★ スキップボタン（result状態の待機時間をスキップ）★
+        window.skipWait = async () => {
+            if (!isHost()) return;
+            try {
+                await window.VibeQuiz.nextQuestion(roomId);
+            } catch (e) {
+                console.error('Skip wait error:', e);
+            }
+        };
+
         function normalize(s) {
             if (!s) return "";
             return s.trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
@@ -1236,12 +1261,18 @@
 
             try {
                 const playlists = await window.VibeQuiz.getPlaylists();
+                const myUserId = localStorage.getItem('vibeQuizUserId') || '';
+
                 playlists.forEach(pl => {
+                    // ★ 個人用プレイリストは自分のものだけ表示 ★
+                    if (pl.isPrivate && pl.ownerUUID !== myUserId) return;
+
                     const label = document.createElement('label');
                     label.className = "flex items-center text-xs cursor-pointer hover:bg-indigo-900 p-1 rounded";
+                    const icon = pl.isPrivate ? '🔒 ' : '';
                     label.innerHTML = `
                         <input type="checkbox" value="${pl.id}" onchange="saveRoomSettings()" class="mr-2 w-3 h-3 accent-pink-500">
-                        <span>${pl.name}</span>
+                        <span>${icon}${pl.name}</span>
                     `;
                     container.appendChild(label);
                 });
