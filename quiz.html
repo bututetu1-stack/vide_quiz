@@ -1100,8 +1100,8 @@
             const isCorrect = nVal === mains || aliases.some(alias => nVal === alias);
 
             if (isCorrect) {
-                // 回答タイム（曲開始からの経過時間）を取得
-                const answerTime = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+                // ★ 既に保存されているmyLastBuzzTimeを使用（時間のズレを防ぐ）★
+                const answerTime = myLastBuzzTime !== null ? myLastBuzzTime : (player && player.getCurrentTime ? player.getCurrentTime() : 0);
                 await window.VibeQuiz.reportWin(roomId, currentUser, currentSongId, currentSongData, answerTime);
             } else {
                 const time = player && player.getCurrentTime ? player.getCurrentTime() : 0;
