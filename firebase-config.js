@@ -272,14 +272,46 @@ window.VibeQuiz = {
 
         if (!songs || Object.keys(songs).length === 0) return null;
 
+        // ★ 未編集曲を除外（isEdited: false の曲は出題しない）★
+        const editedSongs = {};
+        for (const [id, song] of Object.entries(songs)) {
+            if (song.isEdited !== false) {
+                editedSongs[id] = song;
+            }
+        }
+
+        // ★ 編集済み曲数が0の場合は開始できない ★
+        if (Object.keys(editedSongs).length === 0) {
+            await roomRef.update({
+                message: {
+                    text: '⚠️ 編集済みの曲がありません！\\nプレイリスト管理画面で曲名を編集してください。',
+                    type: 'error',
+                    timestamp: Date.now()
+                }
+            });
+            return null;
+        }
+
         const playedSnap = await roomRef.child('played').once('value');
         const played = playedSnap.val() || {};
 
-        const unplayedIds = Object.keys(songs).filter(id => !played[id]);
+        const unplayedIds = Object.keys(editedSongs).filter(id => !played[id]);
 
         const maxQ = parseInt(settings.maxQuestions) || 10;
         const countSnap = await roomRef.child('questionCount').once('value');
         const currentCount = countSnap.val() || 0;
+
+        // ★ 編集済み曲数が問題数未満の場合、警告メッセージ ★
+        const editedCount = Object.keys(editedSongs).length;
+        if (currentCount === 0 && editedCount < maxQ) {
+            await roomRef.update({
+                message: {
+                    text: `⚠️ 編集済み曲数(${editedCount}曲)が設定問題数(${maxQ}問)より少ないです。\\n${editedCount}問で開始します。`,
+                    type: 'warning',
+                    timestamp: Date.now()
+                }
+            });
+        }
 
         // End Game?
         if (unplayedIds.length === 0 || currentCount >= maxQ) {
@@ -346,7 +378,7 @@ window.VibeQuiz = {
         }
 
         const nextId = unplayedIds[Math.floor(Math.random() * unplayedIds.length)];
-        const nextSong = songs[nextId];
+        const nextSong = editedSongs[nextId];  // ★ editedSongsから選択 ★
 
         await roomRef.update({
             currentSongId: nextId,

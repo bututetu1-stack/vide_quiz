@@ -109,6 +109,33 @@
                     </button>
                     <p class="text-xs text-center text-gray-500 mt-2">※選択中のプレイリストに追加されます</p>
                 </div>
+
+                <!-- 一括追加セクション -->
+                <div class="mt-6 pt-6 border-t border-gray-600">
+                    <h3 class="text-lg font-bold mb-3 text-purple-400">📋 一括追加</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-1">YouTube URL（改行区切りで複数入力可）</label>
+                            <textarea id="bulkUrls"
+                                class="w-full p-2 rounded bg-gray-700 border border-gray-600 text-sm focus:outline-none focus:border-purple-500"
+                                rows="5"
+                                placeholder="https://youtu.be/xxx&#10;https://youtu.be/yyy&#10;https://youtu.be/zzz"></textarea>
+                        </div>
+                        <button onclick="bulkAddSongs()"
+                            class="w-full bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold shadow-lg">
+                            一括追加 📥
+                        </button>
+                        <div id="bulkProgress" class="hidden">
+                            <div class="bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div id="bulkProgressBar" class="bg-purple-500 h-full transition-all duration-200"
+                                    style="width: 0%"></div>
+                            </div>
+                            <p id="bulkProgressText" class="text-xs text-gray-400 mt-1 text-center">0 / 0</p>
+                        </div>
+                        <p class="text-xs text-center text-gray-500">⚠️ 一括追加された曲は「未編集」状態になります。<br>曲名を編集するまでクイズには出題されません。
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <!-- Song List -->
@@ -426,7 +453,13 @@
                     (song.addedBy && song.addedBy.toLowerCase().includes(q));
             });
 
-            document.getElementById('songCount').innerText = Object.keys(songs).length;
+            // 編集済み/未編集の曲数をカウント
+            const totalCount = Object.keys(songs).length;
+            const editedCount = Object.values(songs).filter(s => s.isEdited !== false).length;
+            const uneditedCount = totalCount - editedCount;
+            document.getElementById('songCount').innerHTML = uneditedCount > 0
+                ? `${editedCount}<span class="text-gray-500">+${uneditedCount}未編集</span>`
+                : `${totalCount}`;
 
             if (!songs || Object.keys(songs).length === 0) {
                 el.innerHTML = '<div class="text-gray-500 p-4">曲がまだありません</div>';
@@ -439,13 +472,15 @@
 
             filteredEntries.forEach(([key, song]) => {
                 const div = document.createElement('div');
-                div.className = "bg-gray-800 p-3 rounded flex items-center space-x-4 hover:bg-gray-700 transition group";
+                const isUnedited = song.isEdited === false;
+                div.className = `bg-gray-800 p-3 rounded flex items-center space-x-4 hover:bg-gray-700 transition group ${isUnedited ? 'border-l-4 border-yellow-500' : ''}`;
+                const uneditedBadge = isUnedited ? '<span class="bg-yellow-600 text-black text-[10px] px-1 rounded ml-1">⚠️未編集</span>' : '';
                 div.innerHTML = `
                     <img src="${song.thumbnail}" class="w-16 h-9 object-cover rounded bg-black">
                     <div class="flex-grow">
                         <a href="https://www.youtube.com/watch?v=${song.youtubeId}" target="_blank" 
                            class="font-bold text-white text-sm line-clamp-1 hover:text-pink-400 hover:underline cursor-pointer">
-                            ${song.titleMain}
+                            ${song.titleMain}${uneditedBadge}
                         </a>
                         <div class="text-xs text-gray-400 line-clamp-1">${song.titleHira || '-'}</div>
                         ${song.addedBy ? `<div class="text-[10px] text-pink-400">by ${song.addedBy}</div>` : ''}
@@ -512,7 +547,8 @@
                     titleMain: newMain,
                     titleHira: newHira,
                     addedBy: newAddedBy || null,
-                    addedByUUID: newAddedByUUID || null
+                    addedByUUID: newAddedByUUID || null,
+                    isEdited: true  // ★ 編集済みフラグ ★
                 });
                 closeEditModal();
             } catch (e) {
@@ -592,6 +628,74 @@
             if (confirm("削除しますか？")) {
                 await window.VibeQuiz.deleteSong(currentPlaylistId, key);
             }
+        }
+
+        // ★★★ 一括追加機能 ★★★
+        async function bulkAddSongs() {
+            if (!window.VibeQuiz) { alert("Firebase読込中..."); return; }
+
+            const textarea = document.getElementById('bulkUrls');
+            const urls = textarea.value.split(/[\r\n]+/).map(u => u.trim()).filter(u => u);
+
+            if (urls.length === 0) {
+                alert("URLを入力してください");
+                return;
+            }
+
+            const progressEl = document.getElementById('bulkProgress');
+            const progressBar = document.getElementById('bulkProgressBar');
+            const progressText = document.getElementById('bulkProgressText');
+            progressEl.classList.remove('hidden');
+
+            let added = 0;
+            let skipped = 0;
+            const existingIds = Object.values(currentSongs).map(s => s.youtubeId);
+
+            for (let i = 0; i < urls.length; i++) {
+                const url = urls[i];
+                const videoId = extractVideoId(url);
+
+                // 進捗表示更新
+                const percent = ((i + 1) / urls.length) * 100;
+                progressBar.style.width = percent + '%';
+                progressText.textContent = `${i + 1} / ${urls.length}`;
+
+                if (!videoId) {
+                    skipped++;
+                    continue;
+                }
+
+                // 重複チェック
+                if (existingIds.includes(videoId)) {
+                    skipped++;
+                    continue;
+                }
+
+                try {
+                    await window.VibeQuiz.addSongToPlaylist(currentPlaylistId, {
+                        youtubeId: videoId,
+                        titleMain: `【未編集】${videoId}`,  // 仮タイトル
+                        titleHira: '',
+                        thumbnail: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+                        addedBy: null,
+                        addedByUUID: null,
+                        isEdited: false  // ★ 未編集フラグ ★
+                    });
+                    existingIds.push(videoId);
+                    added++;
+                } catch (e) {
+                    console.error(`Failed to add ${videoId}:`, e);
+                    skipped++;
+                }
+            }
+
+            // 完了
+            setTimeout(() => {
+                progressEl.classList.add('hidden');
+                progressBar.style.width = '0%';
+                textarea.value = '';
+                alert(`完了！\n追加: ${added}曲\nスキップ: ${skipped}曲\n\n⚠️ 追加された曲は「未編集」状態です。\n編集ボタンから曲名を設定してください。`);
+            }, 500);
         }
 
         init();
