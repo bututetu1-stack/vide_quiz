@@ -237,6 +237,14 @@
                                 </select>
                             </div>
                         </div>
+
+                        <!-- サビ再生モード -->
+                        <div class="flex items-center justify-between bg-indigo-950 p-2 rounded mt-2">
+                            <label class="text-gray-300">🎵 サビ再生</label>
+                            <input type="checkbox" id="settingReplayHighlight" onchange="saveRoomSettings()"
+                                class="w-5 h-5 accent-pink-400">
+                        </div>
+                        <p class="text-[10px] text-gray-500 text-center">正解/時間切れ後にサビ部分を10秒再生</p>
                     </div>
                 </div>
             </div>
@@ -569,6 +577,7 @@
                 // ★ 設定を変数に保存 ★
                 currentPlayDuration = parseInt(settings.playDuration) || 30;
                 currentAnswerTime = parseInt(settings.answerTime) || 15;
+                window.replayHighlight = settings.replayHighlight || false;  // ★ サビ再生設定 ★
 
                 // Support both new playlistIds and legacy playlistId
                 let playlistIds = settings.playlistIds || [settings.playlistId || 'global'];
@@ -744,16 +753,24 @@
                     skipBtn.classList.add('hidden');
                 }
 
-                // ★ ホストのみが自動進行タイマーを設定 ★
+                // ★★★ サビ再生機能 ★★★
+                if (window.replayHighlight && currentSongData && currentSongData.youtubeId && !window.replayPlaying) {
+                    window.replayPlaying = true;
+                    playHighlightSection(currentSongData.youtubeId);
+                }
+
+                // ★ ホストのみが自動進行タイマーを設定（サビ再生時は延長）★
+                const resultDelay = window.replayHighlight ? 13000 : 6000;  // サビ再生時は13秒待機
                 if (isHost() && !window.resultAutoTimer) {
                     window.resultAutoTimer = setTimeout(async () => {
                         window.resultAutoTimer = null;
+                        window.replayPlaying = false;  // ★ サビ再生フラグリセット ★
                         try {
                             await window.VibeQuiz.nextQuestion(roomId);
                         } catch (e) {
                             console.error('Auto next question error:', e);
                         }
-                    }, 6000);
+                    }, resultDelay);
                 }
             }
             else if (status === 'playing') {
@@ -1144,12 +1161,83 @@
             if (!isHost()) return;
             // ★ タイマーをクリア ★
             if (window.resultAutoTimer) { clearTimeout(window.resultAutoTimer); window.resultAutoTimer = null; }
+            // ★ サビ再生を停止 ★
+            if (player && player.pauseVideo) player.pauseVideo();
+            window.replayPlaying = false;
             try {
                 await window.VibeQuiz.nextQuestion(roomId);
             } catch (e) {
                 console.error('Skip wait error:', e);
             }
         };
+
+        // ★★★ サビ再生機能（Most Replayed Section）★★★
+        async function playHighlightSection(videoId) {
+            if (!player || !videoId) return;
+
+            let peakTime = null;
+
+            // Most Replayed APIからピーク位置を取得
+            try {
+                const response = await fetch(`https://yt.lemnoslife.com/videos?part=mostReplayed&id=${videoId}`);
+                const data = await response.json();
+
+                if (data.items && data.items[0] && data.items[0].mostReplayed) {
+                    const markers = data.items[0].mostReplayed.markers || [];
+                    if (markers.length > 0) {
+                        // 最高強度のマーカーを探す
+                        let maxIntensity = 0;
+                        for (const marker of markers) {
+                            if (marker.intensityScoreNormalized > maxIntensity) {
+                                maxIntensity = marker.intensityScoreNormalized;
+                                peakTime = marker.startMillis / 1000;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log('Most Replayed API error, using fallback:', e);
+            }
+
+            // フォールバック：動画長の1/3位置
+            if (peakTime === null) {
+                const duration = player.getDuration ? player.getDuration() : 180;
+                peakTime = Math.max(30, duration / 3);
+            }
+
+            console.log('Playing highlight at:', peakTime, 'seconds');
+
+            // フェードイン再生
+            player.seekTo(peakTime, true);
+            player.setVolume(0);
+            player.unMute();
+            player.playVideo();
+
+            // 1秒かけてフェードイン
+            let volume = 0;
+            const fadeInInterval = setInterval(() => {
+                volume += 10;
+                if (volume >= 100) {
+                    volume = 100;
+                    clearInterval(fadeInInterval);
+                }
+                player.setVolume(volume);
+            }, 100);
+
+            // 10秒後にフェードアウト
+            setTimeout(() => {
+                let currentVolume = 100;
+                const fadeOutInterval = setInterval(() => {
+                    currentVolume -= 10;
+                    if (currentVolume <= 0) {
+                        currentVolume = 0;
+                        clearInterval(fadeOutInterval);
+                        if (player && player.pauseVideo) player.pauseVideo();
+                    }
+                    player.setVolume(currentVolume);
+                }, 100);
+            }, 10000);
+        }
 
         function normalize(s) {
             if (!s) return "";
@@ -1251,6 +1339,9 @@
             document.getElementById('settingHandicapDelay').value = settings.handicapDelay !== undefined ? settings.handicapDelay : 0;
             toggleHandicapSettings();
 
+            // サビ再生設定
+            document.getElementById('settingReplayHighlight').checked = settings.replayHighlight || false;
+
             // プレイリストチェックボックスの状態を更新
             const playlistIds = settings.playlistIds || ['global'];
             document.querySelectorAll('#playlistCheckboxes input[type="checkbox"]').forEach(cb => {
@@ -1328,6 +1419,7 @@
                 handicapBonus: parseInt(document.getElementById('settingHandicapBonus').value),
                 handicapPenalty: parseInt(document.getElementById('settingHandicapPenalty').value),
                 handicapDelay: parseFloat(document.getElementById('settingHandicapDelay').value),
+                replayHighlight: document.getElementById('settingReplayHighlight').checked,
                 playlistIds: playlistIds
             };
 

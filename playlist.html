@@ -113,17 +113,39 @@
                 <!-- 一括追加セクション -->
                 <div class="mt-6 pt-6 border-t border-gray-600">
                     <h3 class="text-lg font-bold mb-3 text-purple-400">📋 一括追加</h3>
+
+                    <!-- プレイリストURLインポート -->
+                    <div class="space-y-3 mb-4 pb-4 border-b border-gray-700">
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-1">🎵 YouTubeプレイリストURL</label>
+                            <input type="text" id="playlistUrl"
+                                class="w-full p-2 rounded bg-gray-700 border border-gray-600 text-sm focus:outline-none focus:border-pink-500"
+                                placeholder="https://www.youtube.com/playlist?list=...">
+                        </div>
+                        <button onclick="importPlaylist()"
+                            class="w-full bg-pink-600 hover:bg-pink-700 py-2 rounded font-bold shadow-lg text-sm">
+                            プレイリストからインポート 🎶
+                        </button>
+                        <div id="playlistProgress" class="hidden">
+                            <div class="bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div id="playlistProgressBar" class="bg-pink-500 h-full transition-all duration-200"
+                                    style="width: 0%"></div>
+                            </div>
+                            <p id="playlistProgressText" class="text-xs text-gray-400 mt-1 text-center">0 / 0</p>
+                        </div>
+                    </div>
+
+                    <!-- 複数URL一括追加 -->
                     <div class="space-y-3">
                         <div>
-                            <label class="block text-gray-400 text-xs mb-1">YouTube URL（改行区切りで複数入力可）</label>
+                            <label class="block text-gray-400 text-xs mb-1">📝 YouTube URL（改行区切り）</label>
                             <textarea id="bulkUrls"
                                 class="w-full p-2 rounded bg-gray-700 border border-gray-600 text-sm focus:outline-none focus:border-purple-500"
-                                rows="5"
-                                placeholder="https://youtu.be/xxx&#10;https://youtu.be/yyy&#10;https://youtu.be/zzz"></textarea>
+                                rows="4" placeholder="https://youtu.be/xxx&#10;https://youtu.be/yyy"></textarea>
                         </div>
                         <button onclick="bulkAddSongs()"
-                            class="w-full bg-purple-600 hover:bg-purple-700 py-3 rounded font-bold shadow-lg">
-                            一括追加 📥
+                            class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold shadow-lg text-sm">
+                            URL一括追加 📥
                         </button>
                         <div id="bulkProgress" class="hidden">
                             <div class="bg-gray-700 rounded-full h-2 overflow-hidden">
@@ -132,8 +154,7 @@
                             </div>
                             <p id="bulkProgressText" class="text-xs text-gray-400 mt-1 text-center">0 / 0</p>
                         </div>
-                        <p class="text-xs text-center text-gray-500">⚠️ 一括追加された曲は「未編集」状態になります。<br>曲名を編集するまでクイズには出題されません。
-                        </p>
+                        <p class="text-xs text-center text-gray-500">⚠️ 一括追加された曲は「未編集」状態です。<br>編集するまでクイズには出題されません。</p>
                     </div>
                 </div>
             </div>
@@ -696,6 +717,119 @@
                 textarea.value = '';
                 alert(`完了！\n追加: ${added}曲\nスキップ: ${skipped}曲\n\n⚠️ 追加された曲は「未編集」状態です。\n編集ボタンから曲名を設定してください。`);
             }, 500);
+        }
+        // ★★★ YouTubeプレイリストインポート機能 ★★★
+        // APIキー設定（Google Cloud ConsoleからYouTube Data API v3のキーを取得して設定）
+        const YOUTUBE_API_KEY = localStorage.getItem('youtubeApiKey') || '';
+
+        async function importPlaylist() {
+            const url = document.getElementById('playlistUrl').value.trim();
+
+            // プレイリストIDを抽出
+            const listMatch = url.match(/[?&]list=([^&]+)/);
+            if (!listMatch) {
+                alert('有効なYouTubeプレイリストURLではありません。\n例: https://www.youtube.com/playlist?list=PLxxxx');
+                return;
+            }
+            const playlistId = listMatch[1];
+
+            // APIキーチェック
+            if (!YOUTUBE_API_KEY) {
+                const key = prompt('YouTube Data API キーを入力してください。\n\n※ Google Cloud Consoleから取得できます。\n※ 一度入力すると保存されます。');
+                if (!key) return;
+                localStorage.setItem('youtubeApiKey', key);
+                location.reload();
+                return;
+            }
+
+            const progressEl = document.getElementById('playlistProgress');
+            const progressBar = document.getElementById('playlistProgressBar');
+            const progressText = document.getElementById('playlistProgressText');
+            progressEl.classList.remove('hidden');
+            progressText.textContent = '取得中...';
+
+            try {
+                // プレイリストアイテムを取得
+                const items = [];
+                let nextPageToken = '';
+
+                do {
+                    const apiUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${YOUTUBE_API_KEY}${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`;
+                    const response = await fetch(apiUrl);
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error?.message || 'API エラー');
+                    }
+
+                    const data = await response.json();
+                    items.push(...data.items);
+                    nextPageToken = data.nextPageToken || '';
+
+                    progressText.textContent = `取得中... ${items.length}件`;
+                } while (nextPageToken);
+
+                if (items.length === 0) {
+                    alert('プレイリストが空か、非公開です。');
+                    progressEl.classList.add('hidden');
+                    return;
+                }
+
+                // 曲を追加
+                const existingIds = Object.values(currentSongs).map(s => s.youtubeId);
+                let added = 0;
+                let skipped = 0;
+
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    const videoId = item.snippet?.resourceId?.videoId;
+                    const title = item.snippet?.title || '';
+
+                    if (!videoId || title === 'Private video' || title === 'Deleted video') {
+                        skipped++;
+                        continue;
+                    }
+
+                    if (existingIds.includes(videoId)) {
+                        skipped++;
+                        continue;
+                    }
+
+                    // 進捗表示
+                    const percent = ((i + 1) / items.length) * 100;
+                    progressBar.style.width = percent + '%';
+                    progressText.textContent = `${i + 1} / ${items.length}`;
+
+                    try {
+                        await window.VibeQuiz.addSongToPlaylist(currentPlaylistId, {
+                            youtubeId: videoId,
+                            titleMain: `【未編集】${title}`,
+                            titleHira: '',
+                            thumbnail: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+                            addedBy: null,
+                            addedByUUID: null,
+                            isEdited: false
+                        });
+                        existingIds.push(videoId);
+                        added++;
+                    } catch (e) {
+                        console.error(`Failed to add ${videoId}:`, e);
+                        skipped++;
+                    }
+                }
+
+                setTimeout(() => {
+                    progressEl.classList.add('hidden');
+                    progressBar.style.width = '0%';
+                    document.getElementById('playlistUrl').value = '';
+                    alert(`完了！\n追加: ${added}曲\nスキップ: ${skipped}曲\n\n⚠️ 追加された曲は「未編集」状態です。\n編集ボタンから曲名を設定してください。`);
+                }, 500);
+
+            } catch (e) {
+                progressEl.classList.add('hidden');
+                alert('エラー: ' + e.message + '\n\nAPIキーが正しいか確認してください。');
+                console.error('Playlist import error:', e);
+            }
         }
 
         init();

@@ -114,6 +114,9 @@ window.VibeQuiz = {
         if (newSettings.handicapPenalty !== undefined) {
             updates['settings/handicapPenalty'] = parseInt(newSettings.handicapPenalty);
         }
+        if (newSettings.replayHighlight !== undefined) {
+            updates['settings/replayHighlight'] = newSettings.replayHighlight;
+        }
 
         await db.ref(`rooms/${roomId}`).update(updates);
     },
