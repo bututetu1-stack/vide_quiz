@@ -578,7 +578,8 @@
                 // ★ 設定を変数に保存 ★
                 currentPlayDuration = parseInt(settings.playDuration) || 30;
                 currentAnswerTime = parseInt(settings.answerTime) || 15;
-                window.replayHighlight = settings.replayHighlight || false;  // ★ サビ再生設定 ★
+                // ★ サビ再生設定 (デフォルトON) ★
+                window.replayHighlight = settings.replayHighlight !== undefined ? settings.replayHighlight : true;
 
                 // Support both new playlistIds and legacy playlistId
                 let playlistIds = settings.playlistIds || [settings.playlistId || 'global'];
@@ -1379,8 +1380,8 @@
             document.getElementById('settingHandicapDelay').value = settings.handicapDelay !== undefined ? settings.handicapDelay : 0;
             toggleHandicapSettings();
 
-            // サビ再生設定
-            document.getElementById('settingReplayHighlight').checked = settings.replayHighlight || false;
+            // サビ再生設定 (デフォルトON)
+            document.getElementById('settingReplayHighlight').checked = settings.replayHighlight !== undefined ? settings.replayHighlight : true;
 
             // プレイリストチェックボックスの状態を更新
             const playlistIds = settings.playlistIds || ['global'];
