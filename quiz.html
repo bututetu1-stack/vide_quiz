@@ -767,7 +767,8 @@
                 }
 
                 // ★ ホストのみが自動進行タイマーを設定（サビ再生時は延長）★
-                const resultDelay = window.replayHighlight ? 13000 : 6000;  // サビ再生時は13秒待機
+                // Sabi: 1s Pre + 10s Hold + 1s Post = 12s Total. Buffer +2s -> 14s
+                const resultDelay = window.replayHighlight ? 14000 : 6000;  // サビ再生時は14秒待機
                 if (isHost() && !window.resultAutoTimer) {
                     window.resultAutoTimer = setTimeout(async () => {
                         window.resultAutoTimer = null;
