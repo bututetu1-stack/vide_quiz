@@ -1234,14 +1234,14 @@
                 peakTime = Math.max(30, duration / 3);
             }
 
-            // ★ 動画終了間際だとぶつ切りになるので、最低でも15秒（Pres2+Hold10+Post2+Buffer1）残す ★
-            if (peakTime > duration - 15) {
-                peakTime = Math.max(0, duration - 15);
+            // ★ 動画終了間際対策：最低でも12秒（Pres1+Hold10+Post1）残す
+            if (peakTime > duration - 13) {
+                peakTime = Math.max(0, duration - 13);
             }
 
-            // ★ 2秒前から再生（フェードイン用） ★
-            const startPos = Math.max(0, peakTime - 2);
-            console.log(`Sabi Playback: Peak=${peakTime}s, Start=${startPos}s`);
+            // ★ 1秒前から再生（フェードイン用） ★
+            const startPos = Math.max(0, peakTime - 1);
+            console.log(`Sabi Playback: Peak=${peakTime}s, Start=${startPos}s (Duration: 1s In + 10s Hold + 1s Out)`);
 
             // シーク & ボリューム0
             player.seekTo(startPos, true);
@@ -1259,7 +1259,8 @@
             // ★ 再生開始待機 ★
             if (window.sabiIntervals.checkPlay) clearInterval(window.sabiIntervals.checkPlay);
             window.sabiIntervals.checkPlay = setInterval(() => {
-                if (player.getPlayerState() === 1) { // PLAYING
+                const pState = player.getPlayerState();
+                if (pState === 1) { // PLAYING
                     clearInterval(window.sabiIntervals.checkPlay);
                     runSabiSequence();
                 }
@@ -1269,51 +1270,59 @@
             if (window.sabiIntervals.checkTimeout) clearTimeout(window.sabiIntervals.checkTimeout);
             window.sabiIntervals.checkTimeout = setTimeout(() => {
                 if (window.sabiIntervals.checkPlay) clearInterval(window.sabiIntervals.checkPlay);
-                if (window.replayPlaying && player.getPlayerState() !== 1) {
-                    runSabiSequence();
-                }
+                // 再生していなくても強制的にシーケンス開始（稀なケース対策）
+                if (window.replayPlaying) runSabiSequence();
             }, 5000);
 
             function runSabiSequence() {
-                console.log("Starting Sabi Sequence (Fade In -> Hold 10s -> Fade Out)");
+                console.log("Starting Sabi Sequence");
                 if (!window.replayPlaying) return;
 
-                // ① フェードイン (0 -> 100 over 2s)
+                // --- ① Fade In (0 -> 100 over 1s) ---
                 let volume = 0;
+                // 100ms * 10 steps = 1000ms (1s)
+                const fadeStep = 10;
                 if (window.sabiIntervals.fadeIn) clearInterval(window.sabiIntervals.fadeIn);
+
+                console.log("Fade In Start");
                 window.sabiIntervals.fadeIn = setInterval(() => {
-                    volume += 10; // 200ms * 10steps = 2000ms
+                    volume += fadeStep;
                     if (volume >= 100) {
                         volume = 100;
                         clearInterval(window.sabiIntervals.fadeIn);
+                        console.log("Fade In Complete (Vol 100). Holding for 10s...");
                     }
                     if (player.setVolume) player.setVolume(volume);
-                }, 200);
+                }, 100);
 
-                // ② 12秒後にフェードアウト開始 (FadeIn 2s + Hold 10s)
+                // --- ② Schedule Fade Out (Start after 1s FadeIn + 10s Hold = 11s) ---
                 if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
                 window.sabiIntervals.fadeOutTimeout = setTimeout(() => {
-                    // ★ 強制的に100から開始（getVolumeの信頼性低いため） ★
+                    console.log("Fade Out Start");
+
+                    // Force start from 100
                     let currentVolume = 100;
-                    console.log(`Starting Fade Out from: ${currentVolume}`);
+                    if (player.setVolume) player.setVolume(100);
 
                     if (window.sabiIntervals.fadeOut) clearInterval(window.sabiIntervals.fadeOut);
+
+                    // Fade Out (100 -> 0 over 1s)
+                    // 100ms * 10 steps = 1000ms
                     window.sabiIntervals.fadeOut = setInterval(() => {
                         currentVolume -= 10;
-                        // console.log(`FadeOut Vol: ${currentVolume}`); // Debug log
-
                         if (currentVolume <= 0) {
                             currentVolume = 0;
                             clearInterval(window.sabiIntervals.fadeOut);
-                            console.log("Fade Out Complete. Stopping video.");
+                            console.log("Fade Out Complete. Stopping.");
 
-                            // 終了処理
+                            // Stop
                             if (player && player.pauseVideo) player.pauseVideo();
                             window.replayPlaying = false;
                         }
                         if (player.setVolume) player.setVolume(currentVolume);
-                    }, 200); // 200ms * 10steps = 2000ms
-                }, 12000);
+                    }, 100);
+
+                }, 11000); // 1s (In) + 10s (Hold) = 11000ms
             }
         }
 
