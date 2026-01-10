@@ -1271,40 +1271,43 @@
 
             function runSabiSequence() {
                 console.log("Starting Sabi Sequence (Fade In -> Hold 10s -> Fade Out)");
-                if (!window.replayPlaying) return; // 既にキャンセルされていたら実行しない
+                if (!window.replayPlaying) return;
 
                 // ① フェードイン (0 -> 100 over 2s)
                 let volume = 0;
                 if (window.sabiIntervals.fadeIn) clearInterval(window.sabiIntervals.fadeIn);
                 window.sabiIntervals.fadeIn = setInterval(() => {
-                    volume += 5; // 100ms * 20steps = 2000ms
+                    volume += 10; // 200ms * 10steps = 2000ms
                     if (volume >= 100) {
                         volume = 100;
                         clearInterval(window.sabiIntervals.fadeIn);
                     }
                     if (player.setVolume) player.setVolume(volume);
-                }, 100);
+                }, 200);
 
                 // ② 12秒後にフェードアウト開始 (FadeIn 2s + Hold 10s)
-                // ※ startPosから計算すると、Peak到達(2s後) -> Peak再生(10s) -> FadeOut
-                //   つまり再生開始から 12秒後にFadeOut開始
                 if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
                 window.sabiIntervals.fadeOutTimeout = setTimeout(() => {
-                    console.log("Starting Fade Out");
+                    // 現在のボリュームを取得（取得できない場合は100と仮定）
                     let currentVolume = player && player.getVolume ? player.getVolume() : 100;
+                    console.log(`Starting Fade Out from: ${currentVolume}`);
+
                     if (window.sabiIntervals.fadeOut) clearInterval(window.sabiIntervals.fadeOut);
                     window.sabiIntervals.fadeOut = setInterval(() => {
-                        currentVolume -= 5;
+                        currentVolume -= 10;
+                        // console.log(`FadeOut Vol: ${currentVolume}`); // Debug log
+
                         if (currentVolume <= 0) {
                             currentVolume = 0;
                             clearInterval(window.sabiIntervals.fadeOut);
+                            console.log("Fade Out Complete. Stopping video.");
 
                             // 終了処理
                             if (player && player.pauseVideo) player.pauseVideo();
                             window.replayPlaying = false;
                         }
                         if (player.setVolume) player.setVolume(currentVolume);
-                    }, 100); // 100ms * 20steps = 2000ms
+                    }, 200); // 200ms * 10steps = 2000ms
                 }, 12000);
             }
         }
