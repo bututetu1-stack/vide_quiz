@@ -1221,37 +1221,56 @@
                 await player.playVideo(); // Promise対応している場合
             } catch (e) {
                 console.warn("Autoplay blocked or failed:", e);
-                // モバイルなどでの自動再生ブロック対策:
-                // ユーザーに明示的な再生を促すボタンを表示するロジックを検討
-                // ここでは簡易的にトーストを出す
                 showToast("🔊 サビを再生するにはタップ", "info");
-                document.getElementById('startOverlay').classList.remove('hidden'); // オーバーレイを再利用してタップさせる？いや、邪魔か。
+                document.getElementById('startOverlay').classList.remove('hidden');
             }
 
-            // 1秒かけてフェードイン
-            let volume = 0;
-            const fadeInInterval = setInterval(() => {
-                volume += 10;
-                if (volume >= 100) {
-                    volume = 100;
-                    clearInterval(fadeInInterval);
+            // ★ 再生開始を監視してフェードイン開始 ★
+            const checkPlayInterval = setInterval(() => {
+                const state = player.getPlayerState();
+                if (state === 1) { // PLAYING
+                    clearInterval(checkPlayInterval);
+                    startFadeIn();
                 }
-                player.setVolume(volume);
             }, 100);
 
-            // 10秒後にフェードアウト
+            // 5秒経っても再生されなければ強制的にフェードイン開始（無限待ち防止）
             setTimeout(() => {
-                let currentVolume = 100;
-                const fadeOutInterval = setInterval(() => {
-                    currentVolume -= 10;
-                    if (currentVolume <= 0) {
-                        currentVolume = 0;
-                        clearInterval(fadeOutInterval);
-                        if (player && player.pauseVideo) player.pauseVideo();
+                if (checkPlayInterval) clearInterval(checkPlayInterval);
+                // まだボリュームが0なら開始
+                if (player.getVolume() === 0) startFadeIn();
+            }, 5000);
+
+            function startFadeIn() {
+                console.log("Starting Fade In");
+
+                // フェードインアニメーション
+                let volume = 0;
+                const fadeInInterval = setInterval(() => {
+                    volume += 5;
+                    if (volume >= 100) {
+                        volume = 100;
+                        clearInterval(fadeInInterval);
                     }
-                    player.setVolume(currentVolume);
-                }, 100);
-            }, 10000);
+                    player.setVolume(volume);
+                }, 100); // 100ms * 20 = 2000ms fade in
+
+                // 10秒後にフェードアウト開始
+                setTimeout(() => {
+                    console.log("Starting Fade Out");
+                    let currentVolume = 100;
+                    const fadeOutInterval = setInterval(() => {
+                        currentVolume -= 5;
+                        if (currentVolume <= 0) {
+                            currentVolume = 0;
+                            clearInterval(fadeOutInterval);
+                            if (player && player.pauseVideo) player.pauseVideo();
+                            window.replayPlaying = false; // フラグクリア
+                        }
+                        player.setVolume(currentVolume);
+                    }, 100);
+                }, 10000);
+            }
         }
 
         function normalize(s) {
