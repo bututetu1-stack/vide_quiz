@@ -1073,7 +1073,7 @@
                 const state = player.getPlayerState();
                 const time = player.getCurrentTime ? player.getCurrentTime() : 0;
                 document.getElementById('debugInfo').innerText = `St:${state} T:${time.toFixed(1)} PL:${Object.keys(playlist).length}`;
-                if (state === 1 && time > currentPlayDuration) player.pauseVideo();
+                if (state === 1 && currentStatus === 'playing' && time > currentPlayDuration) player.pauseVideo();
             }
         }, 500);
 
