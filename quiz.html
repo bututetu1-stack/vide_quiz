@@ -1246,21 +1246,22 @@
 
                 // フェードインアニメーション
                 let volume = 0;
+                // 負荷軽減のため更新頻度を下げる (250ms間隔)
                 const fadeInInterval = setInterval(() => {
-                    volume += 5;
+                    volume += 10; // 250ms * 10 steps = 2500ms (2.5秒でMAX)
                     if (volume >= 100) {
                         volume = 100;
                         clearInterval(fadeInInterval);
                     }
                     player.setVolume(volume);
-                }, 100); // 100ms * 20 = 2000ms fade in
+                }, 250);
 
                 // 10秒後にフェードアウト開始
                 setTimeout(() => {
                     console.log("Starting Fade Out");
                     let currentVolume = 100;
                     const fadeOutInterval = setInterval(() => {
-                        currentVolume -= 5;
+                        currentVolume -= 10;
                         if (currentVolume <= 0) {
                             currentVolume = 0;
                             clearInterval(fadeOutInterval);
@@ -1268,7 +1269,7 @@
                             window.replayPlaying = false; // フラグクリア
                         }
                         player.setVolume(currentVolume);
-                    }, 100);
+                    }, 250);
                 }, 10000);
             }
         }
