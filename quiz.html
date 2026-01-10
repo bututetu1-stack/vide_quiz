@@ -1229,9 +1229,14 @@
             }
 
             // フォールバック：動画長の1/3位置
+            const duration = player.getDuration ? player.getDuration() : 180;
             if (peakTime === null) {
-                const duration = player.getDuration ? player.getDuration() : 180;
                 peakTime = Math.max(30, duration / 3);
+            }
+
+            // ★ 動画終了間際だとぶつ切りになるので、最低でも15秒（Pres2+Hold10+Post2+Buffer1）残す ★
+            if (peakTime > duration - 15) {
+                peakTime = Math.max(0, duration - 15);
             }
 
             // ★ 2秒前から再生（フェードイン用） ★
