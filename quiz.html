@@ -1257,12 +1257,16 @@
             }
 
             // ★ 再生開始待機 ★
+            let sabiRun = false;
+
             if (window.sabiIntervals.checkPlay) clearInterval(window.sabiIntervals.checkPlay);
             window.sabiIntervals.checkPlay = setInterval(() => {
                 const pState = player.getPlayerState();
                 if (pState === 1) { // PLAYING
                     clearInterval(window.sabiIntervals.checkPlay);
-                    runSabiSequence();
+                    // ★ Timeoutもクリアして二重実行防止
+                    if (window.sabiIntervals.checkTimeout) clearTimeout(window.sabiIntervals.checkTimeout);
+                    if (!sabiRun) runSabiSequence();
                 }
             }, 100);
 
@@ -1271,10 +1275,13 @@
             window.sabiIntervals.checkTimeout = setTimeout(() => {
                 if (window.sabiIntervals.checkPlay) clearInterval(window.sabiIntervals.checkPlay);
                 // 再生していなくても強制的にシーケンス開始（稀なケース対策）
-                if (window.replayPlaying) runSabiSequence();
+                if (window.replayPlaying && !sabiRun) runSabiSequence();
             }, 5000);
 
             function runSabiSequence() {
+                if (sabiRun) return;
+                sabiRun = true;
+
                 console.log("Starting Sabi Sequence");
                 if (!window.replayPlaying) return;
 
