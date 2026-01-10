@@ -1083,7 +1083,15 @@
                 const state = player.getPlayerState();
                 const time = player.getCurrentTime ? player.getCurrentTime() : 0;
                 document.getElementById('debugInfo').innerText = `St:${state} T:${time.toFixed(1)} PL:${Object.keys(playlist).length}`;
-                if (state === 1 && currentStatus === 'playing' && time > currentPlayDuration) player.pauseVideo();
+                // ★ 再生制限の確認 (Playing中のみ) ★
+                // バグ回避: time > 0.5 (ロード直後の0秒判定回避), playbackRate考慮不要
+                if (state === 1 && currentStatus === 'playing' && time > currentPlayDuration) {
+                    // 念のため、現在時刻と開始時刻の差分もチェック（二重チェック）
+                    const elapsedReal = (Date.now() + serverTimeOffset - currentStartTime) / 1000;
+                    if (elapsedReal > currentPlayDuration) {
+                        player.pauseVideo();
+                    }
+                }
             }
         }, 500);
 
