@@ -754,9 +754,14 @@
                 }
 
                 // ★★★ サビ再生機能 ★★★
+                console.log(`[Replay Debug] Highlight: ${window.replayHighlight}, Data: ${!!currentSongData}, Playing: ${window.replayPlaying}`);
                 if (window.replayHighlight && currentSongData && currentSongData.youtubeId && !window.replayPlaying) {
                     window.replayPlaying = true;
-                    playHighlightSection(currentSongData.youtubeId);
+                    playHighlightSection(currentSongData.youtubeId).catch(e => {
+                        console.error("Sabi Playback Failed:", e);
+                        showToast("サビ再生エラー: タップして再生", "error");
+                        // 失敗時は再生ボタンを表示するなどの対策が必要だが、一旦トーストのみ
+                    });
                 }
 
                 // ★ ホストのみが自動進行タイマーを設定（サビ再生時は延長）★
@@ -1210,8 +1215,18 @@
             // フェードイン再生
             player.seekTo(peakTime, true);
             player.setVolume(0);
-            player.unMute();
-            player.playVideo();
+
+            try {
+                player.unMute();
+                await player.playVideo(); // Promise対応している場合
+            } catch (e) {
+                console.warn("Autoplay blocked or failed:", e);
+                // モバイルなどでの自動再生ブロック対策:
+                // ユーザーに明示的な再生を促すボタンを表示するロジックを検討
+                // ここでは簡易的にトーストを出す
+                showToast("🔊 サビを再生するにはタップ", "info");
+                document.getElementById('startOverlay').classList.remove('hidden'); // オーバーレイを再利用してタップさせる？いや、邪魔か。
+            }
 
             // 1秒かけてフェードイン
             let volume = 0;
