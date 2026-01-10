@@ -380,6 +380,7 @@
         // ★★★ 設定変数 ★★★
         let currentPlayDuration = 30; // 曲再生時間（秒）
         let currentAnswerTime = 15;   // 回答入力時間（秒）
+        window.sabiIntervals = {};    // ★ Sabi Playback Intevals ★
 
 
         window.onYouTubeIframeAPIReady = function () {
@@ -795,6 +796,9 @@
                     myLastBuzzTime = null;
                 }
 
+                // ★ 新しい曲が始まったら確実にサビ再生を停止&リセット ★
+                if (window.stopSabiPlayback) window.stopSabiPlayback();
+
                 // ★ ゲーム中は設定セクションとスキップボタンを非表示 ★
                 document.getElementById('settingsSection').classList.add('hidden');
                 document.getElementById('skipWaitBtn').classList.add('hidden');
@@ -1167,8 +1171,9 @@
             // ★ タイマーをクリア ★
             if (window.resultAutoTimer) { clearTimeout(window.resultAutoTimer); window.resultAutoTimer = null; }
             // ★ サビ再生を停止 ★
+            // ★ サビ再生を停止 ★
             if (player && player.pauseVideo) player.pauseVideo();
-            window.replayPlaying = false;
+            if (window.stopSabiPlayback) window.stopSabiPlayback();
             try {
                 await window.VibeQuiz.nextQuestion(roomId);
             } catch (e) {
@@ -1466,6 +1471,20 @@
                 showToast("設定保存エラー", "error");
             }
         }
+
+        // ★ Sabi Playback Cleanup Function ★
+        window.stopSabiPlayback = () => {
+            if (window.sabiIntervals) {
+                if (window.sabiIntervals.checkPlay) clearInterval(window.sabiIntervals.checkPlay);
+                if (window.sabiIntervals.checkTimeout) clearTimeout(window.sabiIntervals.checkTimeout);
+                if (window.sabiIntervals.fadeIn) clearInterval(window.sabiIntervals.fadeIn);
+                if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
+                if (window.sabiIntervals.fadeOut) clearInterval(window.sabiIntervals.fadeOut);
+            }
+            window.replayPlaying = false;
+            // Ensure volume is reset for next song
+            if (player && player.setVolume) player.setVolume(100);
+        };
 
         // プレイリストのロード（初期化時に呼び出し）
         loadPlaylistOptions();
