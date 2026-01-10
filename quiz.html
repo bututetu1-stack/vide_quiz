@@ -1085,11 +1085,21 @@
                 document.getElementById('debugInfo').innerText = `St:${state} T:${time.toFixed(1)} PL:${Object.keys(playlist).length}`;
                 // ★ 再生制限の確認 (Playing中のみ) ★
                 // バグ回避: time > 0.5 (ロード直後の0秒判定回避), playbackRate考慮不要
-                if (state === 1 && currentStatus === 'playing' && time > currentPlayDuration) {
+                if (state === 1 && currentStatus === 'playing') {
                     // 念のため、現在時刻と開始時刻の差分もチェック（二重チェック）
-                    const elapsedReal = (Date.now() + serverTimeOffset - currentStartTime) / 1000;
-                    if (elapsedReal > currentPlayDuration) {
-                        player.pauseVideo();
+                    const elapsed = (Date.now() + serverTimeOffset - currentStartTime) / 1000;
+                    const elapsedReal = elapsed; // Alias for clarity
+
+                    // ★ 3秒間の無敵時間（ロード直後の誤判定防止） ★
+                    // ロード直後は elapsedReal が小さいため、ここでチェックをスキップ
+                    // また、timeが異常に大きい場合（前の曲の残り）もスキップしたいが、
+                    // time > currentPlayDuration は以下でチェック
+
+                    if (elapsedReal > 3) {
+                        if (time > currentPlayDuration && elapsedReal > currentPlayDuration) {
+                            console.log(`TimeUp Pause: T=${time.toFixed(1)}, E=${elapsedReal.toFixed(1)}`);
+                            player.pauseVideo();
+                        }
                     }
                 }
             }
@@ -1281,7 +1291,7 @@
                 if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
                 window.sabiIntervals.fadeOutTimeout = setTimeout(() => {
                     console.log("Starting Fade Out");
-                    let currentVolume = 100;
+                    let currentVolume = player && player.getVolume ? player.getVolume() : 100;
                     if (window.sabiIntervals.fadeOut) clearInterval(window.sabiIntervals.fadeOut);
                     window.sabiIntervals.fadeOut = setInterval(() => {
                         currentVolume -= 5;
