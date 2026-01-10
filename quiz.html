@@ -1293,8 +1293,8 @@
                 // ② 12秒後にフェードアウト開始 (FadeIn 2s + Hold 10s)
                 if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
                 window.sabiIntervals.fadeOutTimeout = setTimeout(() => {
-                    // 現在のボリュームを取得（取得できない場合は100と仮定）
-                    let currentVolume = player && player.getVolume ? player.getVolume() : 100;
+                    // ★ 強制的に100から開始（getVolumeの信頼性低いため） ★
+                    let currentVolume = 100;
                     console.log(`Starting Fade Out from: ${currentVolume}`);
 
                     if (window.sabiIntervals.fadeOut) clearInterval(window.sabiIntervals.fadeOut);
