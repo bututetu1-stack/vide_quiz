@@ -707,6 +707,9 @@
                 const msgText = data.message ? data.message.text.replace(/\n/g, '<br>') : '';
                 document.getElementById('messageBox').innerHTML = msgText;
 
+                // ★ データ受信時にもダミー情報をセット（曲名バレ防止） ★
+                setDummyMediaSession();
+
                 syncUI(currentStatus, data);
             });
         }
