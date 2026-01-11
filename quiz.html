@@ -1290,18 +1290,9 @@
                 console.log(`Starting Sabi Sequence (Mobile=${isMobile})`);
                 if (!window.replayPlaying) return;
 
-                if (isMobile) {
-                    // ★ Mobile Simple Logic (No Fade) ★
-                    // Just hold for 11s (1s Pre + 10s Main) then Stop
-                    // No volume control because it's unreliable/hardware-locked
-                    if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
-                    window.sabiIntervals.fadeOutTimeout = setTimeout(() => {
-                        console.log("Mobile Sabi Complete. Stopping.");
-                        if (player && player.pauseVideo) player.pauseVideo();
-                        window.replayPlaying = false;
-                    }, 11000);
-                    return;
-                }
+                // ★ Re-enable Fade for Mobile with Failsafe ★
+                // スマホでも音量操作が効く端末（Androidの一部など）のためにフェード処理を実行する。
+                // ただし、intervalが遅延して「音が小さいまま」になるのを防ぐため、1.2秒後に強制的に100にする。
 
                 // --- ① Fade In (0 -> 100 over 1s) ---
                 let volume = 0;
@@ -1319,6 +1310,14 @@
                     }
                     if (player.setVolume) player.setVolume(volume);
                 }, 100);
+
+                // ★ Failsafe: Force Volume 100 after 1.2s ★
+                setTimeout(() => {
+                    if (window.replayPlaying && player.setVolume) {
+                        console.log("Failsafe: Forcing Volume 100");
+                        player.setVolume(100);
+                    }
+                }, 1200);
 
                 // --- ② Schedule Fade Out (Start after 1s FadeIn + 10s Hold = 11s) ---
                 if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
