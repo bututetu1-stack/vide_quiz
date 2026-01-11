@@ -453,12 +453,15 @@
             if (currentStatus === 'playing' || currentStatus === 'buzzed') {
                 setDummyMediaSession();
             }
-        }, 500);
+        }, 100);
 
         // Track last sync time to avoid repeated seeks
         let lastSyncStartTime = 0;
 
         function onPlayerStateChange(event) {
+            // ★ Stateが変わるたびにもダミー情報をセット（念押し） ★
+            setDummyMediaSession();
+
             // When video starts playing (state 1), re-sync to correct position
             if (event.data === YT.PlayerState.PLAYING && currentStatus === 'playing' && window.lastStartTime) {
                 const serverStartTime = window.lastStartTime;
