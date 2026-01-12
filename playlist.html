@@ -354,7 +354,8 @@
 
             activeListenerRef = db.ref(path);
             activeListenerRef.on('value', snap => {
-                renderSongs(snap.val() || {});
+                const sortKey = document.getElementById('songSort')?.value || 'addedDesc';
+                renderSongs(snap.val() || {}, '', sortKey);
             });
 
             // ★ プレイリスト情報取得してisPrivate/editable表示更新 ★
