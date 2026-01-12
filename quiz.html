@@ -1129,6 +1129,41 @@
             }
         }, 1000);
 
+        // ★★★ Levenshtein距離（編集距離）計算 ★★★
+        function levenshteinDistance(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) {
+                matrix[i] = [i];
+            }
+            for (let j = 0; j <= a.length; j++) {
+                matrix[0][j] = j;
+            }
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1, // substitution
+                            matrix[i][j - 1] + 1,     // insertion
+                            matrix[i - 1][j] + 1      // deletion
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        // ★★★ ゆらぎ判定（類似度チェック）★★★
+        function isFuzzyMatch(input, target, threshold = 0.8) {
+            if (!input || !target) return false;
+            const dist = levenshteinDistance(input, target);
+            const maxLen = Math.max(input.length, target.length);
+            if (maxLen === 0) return true;
+            const similarity = (maxLen - dist) / maxLen;
+            return similarity >= threshold;
+        }
+
         window.submitAnswer = async function () {
             const val = document.getElementById('answerInput').value.trim();
             document.getElementById('answerInput').value = '';
@@ -1149,7 +1184,26 @@
             // ★ 複数別名対応：改行で分割して各別名と照合 ★
             const titleHiraRaw = currentSongData.titleHira || '';
             const aliases = titleHiraRaw.split(/[\n\r]+/).map(a => normalize(a)).filter(a => a);
-            const isCorrect = nVal === mains || aliases.some(alias => nVal === alias);
+
+            // ★★★ AI ゆらぎ判定：完全一致 OR 80%以上の類似度で正解 ★★★
+            let isCorrect = nVal === mains || aliases.some(alias => nVal === alias);
+
+            // 完全一致しなかった場合、ゆらぎ判定を試行
+            if (!isCorrect && nVal.length >= 2) {  // 2文字以上の入力のみ
+                if (isFuzzyMatch(nVal, mains, 0.8)) {
+                    isCorrect = true;
+                    console.log(`Fuzzy match accepted: "${val}" ≈ "${currentSongData.titleMain}"`);
+                } else {
+                    // 別名に対してもゆらぎ判定
+                    for (const alias of aliases) {
+                        if (isFuzzyMatch(nVal, alias, 0.8)) {
+                            isCorrect = true;
+                            console.log(`Fuzzy match accepted (alias): "${val}" ≈ "${alias}"`);
+                            break;
+                        }
+                    }
+                }
+            }
 
             if (isCorrect) {
                 // ★ 既に保存されているmyLastBuzzTimeを使用（時間のズレを防ぐ）★
@@ -1296,14 +1350,13 @@
                 console.log(`Starting Sabi Sequence (Mobile=${isMobile})`);
                 if (!window.replayPlaying) return;
 
-                // ★ Re-enable Fade for Mobile with Failsafe ★
-                // スマホでも音量操作が効く端末（Androidの一部など）のためにフェード処理を実行する。
-                // ただし、intervalが遅延して「音が小さいまま」になるのを防ぐため、1.2秒後に強制的に100にする。
+                // ★ Mobile Fix: Use longer intervals (200ms) to avoid throttling ★
+                // 200ms * 5 steps = 1000ms (1s), volume += 20 per step
 
                 // --- ① Fade In (0 -> 100 over 1s) ---
                 let volume = 0;
-                // 100ms * 10 steps = 1000ms (1s)
-                const fadeStep = 10;
+                const fadeStep = 20;  // 5 steps of 20
+                const fadeInterval = 200;  // 200ms intervals for mobile reliability
                 if (window.sabiIntervals.fadeIn) clearInterval(window.sabiIntervals.fadeIn);
 
                 console.log("Fade In Start");
@@ -1315,15 +1368,15 @@
                         console.log("Fade In Complete (Vol 100). Holding for 10s...");
                     }
                     if (player.setVolume) player.setVolume(volume);
-                }, 100);
+                }, fadeInterval);
 
-                // ★ Failsafe: Force Volume 100 after 1.2s ★
+                // ★ Failsafe: Force Volume 100 after 1.5s ★
                 setTimeout(() => {
                     if (window.replayPlaying && player.setVolume) {
                         console.log("Failsafe: Forcing Volume 100");
                         player.setVolume(100);
                     }
-                }, 1200);
+                }, 1500);
 
                 // --- ② Schedule Fade Out (Start after 1s FadeIn + 10s Hold = 11s) ---
                 if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
@@ -1336,10 +1389,9 @@
 
                     if (window.sabiIntervals.fadeOut) clearInterval(window.sabiIntervals.fadeOut);
 
-                    // Fade Out (100 -> 0 over 1s)
-                    // 100ms * 10 steps = 1000ms
+                    // Fade Out (100 -> 0 over 1s) using 200ms intervals
                     window.sabiIntervals.fadeOut = setInterval(() => {
-                        currentVolume -= 10;
+                        currentVolume -= 20;
                         if (currentVolume <= 0) {
                             currentVolume = 0;
                             clearInterval(window.sabiIntervals.fadeOut);

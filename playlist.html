@@ -183,11 +183,19 @@
                     </div>
                 </div>
 
-                <!-- Search Box -->
-                <div class="mb-4">
+                <!-- Search Box and Sort -->
+                <div class="mb-4 flex gap-2">
                     <input type="text" id="songSearch" placeholder="🔍 曲名で検索..."
-                        class="w-full p-2 rounded bg-gray-700 border border-gray-600 text-sm focus:outline-none focus:border-green-500"
+                        class="flex-grow p-2 rounded bg-gray-700 border border-gray-600 text-sm focus:outline-none focus:border-green-500"
                         oninput="filterSongs()">
+                    <select id="songSort" onchange="filterSongs()"
+                        class="p-2 rounded bg-gray-700 border border-gray-600 text-sm focus:outline-none focus:border-green-500">
+                        <option value="addedDesc">⛳ 追加日 (新しい順)</option>
+                        <option value="addedAsc">⛳ 追加日 (古い順)</option>
+                        <option value="titleAsc">🎵 曲名 (A-Z)</option>
+                        <option value="titleDesc">🎵 曲名 (Z-A)</option>
+                        <option value="addedByAsc">👤 追加者 (A-Z)</option>
+                    </select>
                 </div>
 
                 <div id="songsContainer" class="grid grid-cols-1 gap-3"></div>
@@ -457,10 +465,34 @@
 
         function filterSongs() {
             const query = document.getElementById('songSearch').value;
-            renderSongs(currentSongs, query);
+            const sortKey = document.getElementById('songSort').value;
+            renderSongs(currentSongs, query, sortKey);
         }
 
-        function renderSongs(songs, searchQuery = '') {
+        function sortSongs(entries, sortKey) {
+            return entries.sort((a, b) => {
+                const [keyA, songA] = a;
+                const [keyB, songB] = b;
+
+                switch (sortKey) {
+                    case 'addedDesc':
+                        // Firebase push keys are chronological, so compare them directly
+                        return keyB.localeCompare(keyA);
+                    case 'addedAsc':
+                        return keyA.localeCompare(keyB);
+                    case 'titleAsc':
+                        return (songA.titleMain || '').localeCompare(songB.titleMain || '', 'ja');
+                    case 'titleDesc':
+                        return (songB.titleMain || '').localeCompare(songA.titleMain || '', 'ja');
+                    case 'addedByAsc':
+                        return (songA.addedBy || '').localeCompare(songB.addedBy || '', 'ja');
+                    default:
+                        return 0;
+                }
+            });
+        }
+
+        function renderSongs(songs, searchQuery = '', sortKey = 'addedDesc') {
             currentSongs = songs; // Store for filtering
             const el = document.getElementById('songsContainer');
             el.innerHTML = '';
@@ -491,7 +523,10 @@
                 return;
             }
 
-            filteredEntries.forEach(([key, song]) => {
+            // ★ ソート適用 ★
+            const sortedEntries = sortSongs(filteredEntries, sortKey);
+
+            sortedEntries.forEach(([key, song]) => {
                 const div = document.createElement('div');
                 const isUnedited = song.isEdited === false;
                 div.className = `bg-gray-800 p-3 rounded flex items-center space-x-4 hover:bg-gray-700 transition group ${isUnedited ? 'border-l-4 border-yellow-500' : ''}`;
