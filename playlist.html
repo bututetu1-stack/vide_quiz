@@ -475,16 +475,22 @@
                 const [keyA, songA] = a;
                 const [keyB, songB] = b;
 
+                // Helper to get reading or main title
+                const getTitle = (s) => (s.titleHira || s.titleMain || '').toLowerCase();
+
                 switch (sortKey) {
                     case 'addedDesc':
-                        // Firebase push keys are chronological, so compare them directly
-                        return keyB.localeCompare(keyA);
+                        if (keyA > keyB) return -1;
+                        if (keyA < keyB) return 1;
+                        return 0;
                     case 'addedAsc':
-                        return keyA.localeCompare(keyB);
+                        if (keyA > keyB) return 1;
+                        if (keyA < keyB) return -1;
+                        return 0;
                     case 'titleAsc':
-                        return (songA.titleMain || '').localeCompare(songB.titleMain || '', 'ja');
+                        return getTitle(songA).localeCompare(getTitle(songB), 'ja');
                     case 'titleDesc':
-                        return (songB.titleMain || '').localeCompare(songA.titleMain || '', 'ja');
+                        return getTitle(songB).localeCompare(getTitle(songA), 'ja');
                     case 'addedByAsc':
                         return (songA.addedBy || '').localeCompare(songB.addedBy || '', 'ja');
                     default:
