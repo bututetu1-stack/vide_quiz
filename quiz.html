@@ -905,12 +905,18 @@
 
                         if (!url || !url.includes(videoId)) {
                             // 新しい曲をロード
+                            console.log(`Loading new video: ${videoId} from ${seekTo}s`);
                             player.loadVideoById({
                                 videoId: videoId,
                                 startSeconds: seekTo
                             });
-                            player.setVolume(100);
-                            console.log(`Playing: ${videoId} from ${seekTo}s`);
+                            // ★ 明示的に再生開始（autoplayブロック対策）★
+                            setTimeout(() => {
+                                if (player.unMute) player.unMute();
+                                if (player.setVolume) player.setVolume(100);
+                                if (player.playVideo) player.playVideo();
+                                console.log('Explicit playVideo called after loadVideoById');
+                            }, 500);
                         } else {
                             // ★ 同じ曲ならseekして再生 ★
                             if (seekTo > 0) {
