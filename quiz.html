@@ -488,16 +488,12 @@
 
         function onPlayerError(event) {
             console.error("Youtube Error", event.data);
-            // Only show error if we're actually playing a game
+            // ★ エラー時は自動スキップしない（誤判定防止）★
+            // 一部の動画で一時的なエラーが発生することがあるため、自動スキップを無効化
             if (currentStatus === 'playing' && currentSongId) {
-                showToast(`⚠️ 再生エラー (スキップ)`, 'error');
-                if (isHost()) {
-                    setTimeout(() => {
-                        const song = playlist[currentSongId];
-                        const qCount = window.currentQuestionCount || 0;
-                        window.VibeQuiz.reportTimeUp(roomId, song ? song.titleMain : "???", song, qCount);
-                    }, 2000);
-                }
+                console.log("Player error occurred, but NOT auto-skipping");
+                // showToast だけ表示し、自動スキップはしない
+                // showToast(`⚠️ 再生エラー`, 'error');
             }
         }
 
