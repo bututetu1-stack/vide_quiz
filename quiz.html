@@ -794,6 +794,9 @@
                 // ★ result状態のタイマーをクリア ★
                 if (window.resultAutoTimer) { clearTimeout(window.resultAutoTimer); window.resultAutoTimer = null; }
 
+                // ★ 新問題開始時にsentTimeUpをリセット（前問の状態を引き継がない）★
+                window.sentTimeUp = false;
+
                 els.buzzerStatus.classList.add('hidden');
                 els.buzzer.classList.remove('hidden');
 
@@ -1115,9 +1118,14 @@
         // ★★★ Use isHost() function ★★★
         setInterval(() => {
             if (isHost() && currentStatus === 'playing') {
+                // ★ 開始から3秒以内は時間切れ判定をスキップ（動画ロード待機）★
+                const elapsedMs = currentStartTime ? Date.now() - currentStartTime : 0;
+                if (elapsedMs < 3000) return;
+
                 let isTimeUp = false;
-                if (player && player.getCurrentTime && player.getCurrentTime() > currentPlayDuration + 0.5) isTimeUp = true;
-                if (currentStartTime && Date.now() - currentStartTime > (currentPlayDuration * 1000) + 2000) isTimeUp = true;
+                // ★ player.getCurrentTime()はロード前に前の動画の時間を返すことがあるため、経過時間も併用 ★
+                if (player && player.getCurrentTime && player.getCurrentTime() > currentPlayDuration + 0.5 && elapsedMs > (currentPlayDuration * 1000)) isTimeUp = true;
+                if (currentStartTime && elapsedMs > (currentPlayDuration * 1000) + 2000) isTimeUp = true;
 
                 if (isTimeUp && !window.sentTimeUp) {
                     const song = playlist[currentSongId];
