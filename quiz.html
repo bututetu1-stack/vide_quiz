@@ -377,8 +377,6 @@
         let handicapMode = false;
         let serverTimeOffset = 0; // Difference between server and client time
         let myLastBuzzTime = null; // ★ 自分が押した秒数を一時保存 ★
-        let playerHasPlayedThisQuestion = false; // ★ 新: プレイヤーが実際に再生を開始したか ★
-        let lastQuestionSongId = null; // ★ 新: 前回の曲ID（新問題検出用） ★
         // ★★★ 設定変数 ★★★
         let currentPlayDuration = 30; // 曲再生時間（秒）
         let currentAnswerTime = 15;   // 回答入力時間（秒）
@@ -463,14 +461,6 @@
         function onPlayerStateChange(event) {
             // ★ ALWAYS set dummy media session on ANY state change (prevents title leak) ★
             setDummyMediaSession();
-
-            // ★ 新: プレイヤーが実際に再生を開始したらフラグをセット ★
-            if (event.data === YT.PlayerState.PLAYING && currentStatus === 'playing') {
-                if (!playerHasPlayedThisQuestion) {
-                    console.log('Player started playing - setting playerHasPlayedThisQuestion = true');
-                    playerHasPlayedThisQuestion = true;
-                }
-            }
 
             // When video starts playing (state 1), re-sync to correct position
             if (event.data === YT.PlayerState.PLAYING && currentStatus === 'playing' && window.lastStartTime) {
@@ -702,18 +692,7 @@
                 currentSongId = data.currentSongId;
                 currentSongAddedBy = data.currentSongAddedBy || null;
                 wrongAnswers = data.wrongAnswers || {};
-
-                // ★ playStartTime のフォールバック処理 ★
-                // Firebaseの値が古い場合やない場合は、ローカル時刻を使用
-                const now = Date.now();
-                let newStartTime = data.playStartTime || data.startTime || 0;
-
-                // 未来の値または30秒以上前の値は信頼しない（status=playingへの遷移時）
-                if (currentStatus === 'playing' && (!newStartTime || newStartTime > now + 5000 || (now - newStartTime) > 30000)) {
-                    console.log(`Using local timestamp as fallback (Firebase: ${newStartTime}, Now: ${now})`);
-                    newStartTime = now;
-                }
-                currentStartTime = newStartTime;
+                currentStartTime = data.playStartTime || data.startTime || 0;
 
                 const qCount = data.questionCount || 0;
                 window.currentQuestionCount = qCount;
@@ -815,16 +794,6 @@
                 // ★ result状態のタイマーをクリア ★
                 if (window.resultAutoTimer) { clearTimeout(window.resultAutoTimer); window.resultAutoTimer = null; }
 
-                // ★ 新問題開始時にsentTimeUpをリセット（前問の状態を引き継がない）★
-                window.sentTimeUp = false;
-
-                // ★ 新: 新しい問題が始まったらフラグをリセット ★
-                if (currentSongId !== lastQuestionSongId) {
-                    console.log(`New question detected: ${lastQuestionSongId} -> ${currentSongId}. Resetting playerHasPlayedThisQuestion.`);
-                    playerHasPlayedThisQuestion = false;
-                    lastQuestionSongId = currentSongId;
-                }
-
                 els.buzzerStatus.classList.add('hidden');
                 els.buzzer.classList.remove('hidden');
 
@@ -905,18 +874,12 @@
 
                         if (!url || !url.includes(videoId)) {
                             // 新しい曲をロード
-                            console.log(`Loading new video: ${videoId} from ${seekTo}s`);
                             player.loadVideoById({
                                 videoId: videoId,
                                 startSeconds: seekTo
                             });
-                            // ★ 明示的に再生開始（autoplayブロック対策）★
-                            setTimeout(() => {
-                                if (player.unMute) player.unMute();
-                                if (player.setVolume) player.setVolume(100);
-                                if (player.playVideo) player.playVideo();
-                                console.log('Explicit playVideo called after loadVideoById');
-                            }, 500);
+                            player.setVolume(100);
+                            console.log(`Playing: ${videoId} from ${seekTo}s`);
                         } else {
                             // ★ 同じ曲ならseekして再生 ★
                             if (seekTo > 0) {
@@ -1152,24 +1115,11 @@
         // ★★★ Use isHost() function ★★★
         setInterval(() => {
             if (isHost() && currentStatus === 'playing') {
-                // ★ 新: プレイヤーが実際に再生を開始していない場合はスキップ ★
-                if (!playerHasPlayedThisQuestion) {
-                    console.log('Time-up check skipped: playerHasPlayedThisQuestion is false');
-                    return;
-                }
-
-                // ★ 経過時間ベースで判定 ★
-                const now = Date.now();
-                const elapsedMs = currentStartTime ? now - currentStartTime : 0;
-
-                // 5秒未満はスキップ（ロード待機）
-                if (elapsedMs < 5000) return;
-
                 let isTimeUp = false;
-                if (elapsedMs > (currentPlayDuration * 1000) + 2000) isTimeUp = true;
+                if (player && player.getCurrentTime && player.getCurrentTime() > currentPlayDuration + 0.5) isTimeUp = true;
+                if (currentStartTime && Date.now() - currentStartTime > (currentPlayDuration * 1000) + 2000) isTimeUp = true;
 
                 if (isTimeUp && !window.sentTimeUp) {
-                    console.log(`Time-up triggered: elapsed=${elapsedMs}ms, duration=${currentPlayDuration}s`);
                     const song = playlist[currentSongId];
                     const qCount = window.currentQuestionCount || 0;
                     window.sentTimeUp = true;
@@ -1400,19 +1350,77 @@
                 console.log(`Starting Sabi Sequence (Mobile=${isMobile})`);
                 if (!window.replayPlaying) return;
 
-                // ★ PC・Mobile共通：フェードなしで即座に再生 ★
-                // フェード処理は不安定なため、シンプルに即座に音量100で再生し、11秒後に停止
-                console.log("Playing at full volume (no fade)");
-                if (player.setVolume) player.setVolume(100);
-                if (player.unMute) player.unMute();
+                // ★ Mobile: Skip fades entirely (Option A) ★
+                // モバイル端末では setVolume が効かないか、throttling されるため
+                // フェードを諦めて単純に再生 -> 11秒後に停止
+                if (isMobile) {
+                    console.log("Mobile: Skipping fades, just play at current volume");
+                    // 音量を最大に（効かない端末もあるが念のため）
+                    if (player.setVolume) player.setVolume(100);
 
-                // 11秒後に停止（1秒Pre + 10秒Main）
+                    // 11秒後に停止（1秒Pre + 10秒Main）
+                    if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
+                    window.sabiIntervals.fadeOutTimeout = setTimeout(() => {
+                        console.log("Mobile Sabi Complete. Stopping.");
+                        if (player && player.pauseVideo) player.pauseVideo();
+                        window.replayPlaying = false;
+                    }, 11000);
+                    return;
+                }
+
+                // ★ PC: Use normal fade logic ★
+                // --- ① Fade In (0 -> 100 over 1s) ---
+                let volume = 0;
+                const fadeStep = 20;  // 5 steps of 20
+                const fadeInterval = 200;  // 200ms intervals
+                if (window.sabiIntervals.fadeIn) clearInterval(window.sabiIntervals.fadeIn);
+
+                console.log("Fade In Start");
+                window.sabiIntervals.fadeIn = setInterval(() => {
+                    volume += fadeStep;
+                    if (volume >= 100) {
+                        volume = 100;
+                        clearInterval(window.sabiIntervals.fadeIn);
+                        console.log("Fade In Complete (Vol 100). Holding for 10s...");
+                    }
+                    if (player.setVolume) player.setVolume(volume);
+                }, fadeInterval);
+
+                // ★ Failsafe: Force Volume 100 after 1.5s ★
+                setTimeout(() => {
+                    if (window.replayPlaying && player.setVolume) {
+                        console.log("Failsafe: Forcing Volume 100");
+                        player.setVolume(100);
+                    }
+                }, 1500);
+
+                // --- ② Schedule Fade Out (Start after 1s FadeIn + 10s Hold = 11s) ---
                 if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
                 window.sabiIntervals.fadeOutTimeout = setTimeout(() => {
-                    console.log("Sabi Complete. Stopping.");
-                    if (player && player.pauseVideo) player.pauseVideo();
-                    window.replayPlaying = false;
-                }, 11000);
+                    console.log("Fade Out Start");
+
+                    // Force start from 100
+                    let currentVolume = 100;
+                    if (player.setVolume) player.setVolume(100);
+
+                    if (window.sabiIntervals.fadeOut) clearInterval(window.sabiIntervals.fadeOut);
+
+                    // Fade Out (100 -> 0 over 1s) using 200ms intervals
+                    window.sabiIntervals.fadeOut = setInterval(() => {
+                        currentVolume -= 20;
+                        if (currentVolume <= 0) {
+                            currentVolume = 0;
+                            clearInterval(window.sabiIntervals.fadeOut);
+                            console.log("Fade Out Complete. Stopping.");
+
+                            // Stop
+                            if (player && player.pauseVideo) player.pauseVideo();
+                            window.replayPlaying = false;
+                        }
+                        if (player.setVolume) player.setVolume(currentVolume);
+                    }, 100);
+
+                }, 11000); // 1s (In) + 10s (Hold) = 11000ms
             }
         }
 
@@ -1427,8 +1435,8 @@
             result = result.replace(/[!！?？、。,.\-~～]/g, "");
             // 括弧類を削除
             result = result.replace(/[『』「」【】《》〈〉（）()]/g, "");
-            // その他の記号を削除
-            result = result.replace(/[☆★♡♥♪♫◆◇○●□■△▲▽▼◎&＆*＊#＃@＠+＋=＝:：;；/／\\＼^＾|｜¥$￥%％]/g, "");
+            // 星・ハート・その他の記号を削除
+            result = result.replace(/[☆★♡♥♪♫◆◇○●□■△▲▽▼◎]/g, "");
             return result.toLowerCase();
         }
 
