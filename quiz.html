@@ -1426,8 +1426,12 @@
 
         function normalize(s) {
             if (!s) return "";
-            return s.trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-                .replace(/[\s\u3000!！?？、。,\.\-~～]/g, "").toLowerCase();
+            return s.trim()
+                // 全角英数字を半角に変換
+                .replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                // 空白、句読点、記号を削除（☆★♡♥❤🎵🎶♪♫等の装飾記号も含む）
+                .replace(/[\s\u3000!！?？、。,\.\-~～☆★♡♥❤🎵🎶♪♫♬✨💕💖🌟⭐︎✩✪♠♣♦♧◆◇○●□■△▲▽▼◎★☆『』「」【】《》〈〉（）\(\)＆&＊\*＃#＠@＋\+＝=：:；;／\/＼\\＾\^\|｜¥$￥%％]/g, "")
+                .toLowerCase();
         }
 
         // ★★★ Host Control Functions ★★★
