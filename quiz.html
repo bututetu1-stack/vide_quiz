@@ -1118,14 +1118,22 @@
         // ★★★ Use isHost() function ★★★
         setInterval(() => {
             if (isHost() && currentStatus === 'playing') {
-                // ★ 開始から3秒以内は時間切れ判定をスキップ（動画ロード待機）★
-                const elapsedMs = currentStartTime ? Date.now() - currentStartTime : 0;
-                if (elapsedMs < 3000) return;
+                // ★ currentStartTimeの妥当性チェック ★
+                // FirebaseのplayStartTimeが古いまま残っていると即時間切れになるため、
+                // 5分以上前の値は無効とみなす
+                const now = Date.now();
+                if (!currentStartTime || currentStartTime > now || (now - currentStartTime) > 300000) {
+                    return; // 無効なcurrentStartTimeなので判定スキップ
+                }
+
+                const elapsedMs = now - currentStartTime;
+
+                // ★ 開始から5秒以内は時間切れ判定をスキップ（動画ロード待機）★
+                if (elapsedMs < 5000) return;
 
                 let isTimeUp = false;
-                // ★ player.getCurrentTime()はロード前に前の動画の時間を返すことがあるため、経過時間も併用 ★
-                if (player && player.getCurrentTime && player.getCurrentTime() > currentPlayDuration + 0.5 && elapsedMs > (currentPlayDuration * 1000)) isTimeUp = true;
-                if (currentStartTime && elapsedMs > (currentPlayDuration * 1000) + 2000) isTimeUp = true;
+                // ★ 経過時間ベースのみで判定（player.getCurrentTimeは不安定）★
+                if (elapsedMs > (currentPlayDuration * 1000) + 2000) isTimeUp = true;
 
                 if (isTimeUp && !window.sentTimeUp) {
                     const song = playlist[currentSongId];
@@ -1358,77 +1366,19 @@
                 console.log(`Starting Sabi Sequence (Mobile=${isMobile})`);
                 if (!window.replayPlaying) return;
 
-                // ★ Mobile: Skip fades entirely (Option A) ★
-                // モバイル端末では setVolume が効かないか、throttling されるため
-                // フェードを諦めて単純に再生 -> 11秒後に停止
-                if (isMobile) {
-                    console.log("Mobile: Skipping fades, just play at current volume");
-                    // 音量を最大に（効かない端末もあるが念のため）
-                    if (player.setVolume) player.setVolume(100);
+                // ★ PC・Mobile共通：フェードなしで即座に再生 ★
+                // フェード処理は不安定なため、シンプルに即座に音量100で再生し、11秒後に停止
+                console.log("Playing at full volume (no fade)");
+                if (player.setVolume) player.setVolume(100);
+                if (player.unMute) player.unMute();
 
-                    // 11秒後に停止（1秒Pre + 10秒Main）
-                    if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
-                    window.sabiIntervals.fadeOutTimeout = setTimeout(() => {
-                        console.log("Mobile Sabi Complete. Stopping.");
-                        if (player && player.pauseVideo) player.pauseVideo();
-                        window.replayPlaying = false;
-                    }, 11000);
-                    return;
-                }
-
-                // ★ PC: Use normal fade logic ★
-                // --- ① Fade In (0 -> 100 over 1s) ---
-                let volume = 0;
-                const fadeStep = 20;  // 5 steps of 20
-                const fadeInterval = 200;  // 200ms intervals
-                if (window.sabiIntervals.fadeIn) clearInterval(window.sabiIntervals.fadeIn);
-
-                console.log("Fade In Start");
-                window.sabiIntervals.fadeIn = setInterval(() => {
-                    volume += fadeStep;
-                    if (volume >= 100) {
-                        volume = 100;
-                        clearInterval(window.sabiIntervals.fadeIn);
-                        console.log("Fade In Complete (Vol 100). Holding for 10s...");
-                    }
-                    if (player.setVolume) player.setVolume(volume);
-                }, fadeInterval);
-
-                // ★ Failsafe: Force Volume 100 after 1.5s ★
-                setTimeout(() => {
-                    if (window.replayPlaying && player.setVolume) {
-                        console.log("Failsafe: Forcing Volume 100");
-                        player.setVolume(100);
-                    }
-                }, 1500);
-
-                // --- ② Schedule Fade Out (Start after 1s FadeIn + 10s Hold = 11s) ---
+                // 11秒後に停止（1秒Pre + 10秒Main）
                 if (window.sabiIntervals.fadeOutTimeout) clearTimeout(window.sabiIntervals.fadeOutTimeout);
                 window.sabiIntervals.fadeOutTimeout = setTimeout(() => {
-                    console.log("Fade Out Start");
-
-                    // Force start from 100
-                    let currentVolume = 100;
-                    if (player.setVolume) player.setVolume(100);
-
-                    if (window.sabiIntervals.fadeOut) clearInterval(window.sabiIntervals.fadeOut);
-
-                    // Fade Out (100 -> 0 over 1s) using 200ms intervals
-                    window.sabiIntervals.fadeOut = setInterval(() => {
-                        currentVolume -= 20;
-                        if (currentVolume <= 0) {
-                            currentVolume = 0;
-                            clearInterval(window.sabiIntervals.fadeOut);
-                            console.log("Fade Out Complete. Stopping.");
-
-                            // Stop
-                            if (player && player.pauseVideo) player.pauseVideo();
-                            window.replayPlaying = false;
-                        }
-                        if (player.setVolume) player.setVolume(currentVolume);
-                    }, 100);
-
-                }, 11000); // 1s (In) + 10s (Hold) = 11000ms
+                    console.log("Sabi Complete. Stopping.");
+                    if (player && player.pauseVideo) player.pauseVideo();
+                    window.replayPlaying = false;
+                }, 11000);
             }
         }
 
