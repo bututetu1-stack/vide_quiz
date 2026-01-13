@@ -692,7 +692,18 @@
                 currentSongId = data.currentSongId;
                 currentSongAddedBy = data.currentSongAddedBy || null;
                 wrongAnswers = data.wrongAnswers || {};
-                currentStartTime = data.playStartTime || data.startTime || 0;
+
+                // ★ playStartTime のフォールバック処理 ★
+                // Firebaseの値が古い場合やない場合は、ローカル時刻を使用
+                const now = Date.now();
+                let newStartTime = data.playStartTime || data.startTime || 0;
+
+                // 未来の値または30秒以上前の値は信頼しない（status=playingへの遷移時）
+                if (currentStatus === 'playing' && (!newStartTime || newStartTime > now + 5000 || (now - newStartTime) > 30000)) {
+                    console.log(`Using local timestamp as fallback (Firebase: ${newStartTime}, Now: ${now})`);
+                    newStartTime = now;
+                }
+                currentStartTime = newStartTime;
 
                 const qCount = data.questionCount || 0;
                 window.currentQuestionCount = qCount;
