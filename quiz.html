@@ -377,6 +377,8 @@
         let handicapMode = false;
         let serverTimeOffset = 0; // Difference between server and client time
         let myLastBuzzTime = null; // ★ 自分が押した秒数を一時保存 ★
+        let playerHasPlayedThisQuestion = false; // ★ 新: プレイヤーが実際に再生を開始したか ★
+        let lastQuestionSongId = null; // ★ 新: 前回の曲ID（新問題検出用） ★
         // ★★★ 設定変数 ★★★
         let currentPlayDuration = 30; // 曲再生時間（秒）
         let currentAnswerTime = 15;   // 回答入力時間（秒）
@@ -461,6 +463,14 @@
         function onPlayerStateChange(event) {
             // ★ ALWAYS set dummy media session on ANY state change (prevents title leak) ★
             setDummyMediaSession();
+
+            // ★ 新: プレイヤーが実際に再生を開始したらフラグをセット ★
+            if (event.data === YT.PlayerState.PLAYING && currentStatus === 'playing') {
+                if (!playerHasPlayedThisQuestion) {
+                    console.log('Player started playing - setting playerHasPlayedThisQuestion = true');
+                    playerHasPlayedThisQuestion = true;
+                }
+            }
 
             // When video starts playing (state 1), re-sync to correct position
             if (event.data === YT.PlayerState.PLAYING && currentStatus === 'playing' && window.lastStartTime) {
@@ -808,6 +818,13 @@
                 // ★ 新問題開始時にsentTimeUpをリセット（前問の状態を引き継がない）★
                 window.sentTimeUp = false;
 
+                // ★ 新: 新しい問題が始まったらフラグをリセット ★
+                if (currentSongId !== lastQuestionSongId) {
+                    console.log(`New question detected: ${lastQuestionSongId} -> ${currentSongId}. Resetting playerHasPlayedThisQuestion.`);
+                    playerHasPlayedThisQuestion = false;
+                    lastQuestionSongId = currentSongId;
+                }
+
                 els.buzzerStatus.classList.add('hidden');
                 els.buzzer.classList.remove('hidden');
 
@@ -1129,24 +1146,24 @@
         // ★★★ Use isHost() function ★★★
         setInterval(() => {
             if (isHost() && currentStatus === 'playing') {
-                // ★ currentStartTimeの妥当性チェック ★
-                // FirebaseのplayStartTimeが古いまま残っていると即時間切れになるため、
-                // 5分以上前の値は無効とみなす
-                const now = Date.now();
-                if (!currentStartTime || currentStartTime > now || (now - currentStartTime) > 300000) {
-                    return; // 無効なcurrentStartTimeなので判定スキップ
+                // ★ 新: プレイヤーが実際に再生を開始していない場合はスキップ ★
+                if (!playerHasPlayedThisQuestion) {
+                    console.log('Time-up check skipped: playerHasPlayedThisQuestion is false');
+                    return;
                 }
 
-                const elapsedMs = now - currentStartTime;
+                // ★ 経過時間ベースで判定 ★
+                const now = Date.now();
+                const elapsedMs = currentStartTime ? now - currentStartTime : 0;
 
-                // ★ 開始から5秒以内は時間切れ判定をスキップ（動画ロード待機）★
+                // 5秒未満はスキップ（ロード待機）
                 if (elapsedMs < 5000) return;
 
                 let isTimeUp = false;
-                // ★ 経過時間ベースのみで判定（player.getCurrentTimeは不安定）★
                 if (elapsedMs > (currentPlayDuration * 1000) + 2000) isTimeUp = true;
 
                 if (isTimeUp && !window.sentTimeUp) {
+                    console.log(`Time-up triggered: elapsed=${elapsedMs}ms, duration=${currentPlayDuration}s`);
                     const song = playlist[currentSongId];
                     const qCount = window.currentQuestionCount || 0;
                     window.sentTimeUp = true;
